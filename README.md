@@ -1,2 +1,4 @@
 # 2063-Z80-cpm
-A flash boot-loader and cp/m 2.2 BIOS
+An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/johnwinans/2063-Z80)
+
+
