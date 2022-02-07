@@ -1,7 +1,7 @@
 # 2063-Z80-cpm
 An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/johnwinans/2063-Z80)
 
-## Resources
+## Resource links
 
 * [Simplified SD card specification](https://www.sdcard.org/downloads/pls/)
 * [Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
