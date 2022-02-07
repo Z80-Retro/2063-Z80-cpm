@@ -133,8 +133,8 @@ If we write "Hello world!" into partition 1:
 Note that from the perspective of the whole drive, the string starts at 0x00100000
 and from the perspective of the partition, it starts at 0x00000000.
 
-Recall that partition starts at LBA  block number 0x800, which is `0x800*0x200 = 0x00100000`
-from the start of the raw disk image.
+Recall that partition 1 starts at LBA  block number 0x800, which is at byte offset 
+`0x800*0x200 = 0x00100000` from the start of the raw disk image.
 
 Therefore, we can use `dd` to copy raw binary images into either the entire drive starting
 at block number 0 (where the MBR is) or into any partition from their respective begining.
