@@ -1,6 +1,15 @@
 # 2063-Z80-cpm
 An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/johnwinans/2063-Z80)
 
+## Resources
+
+![Simplified SD card specification](https://www.sdcard.org/downloads/pls/)
+![Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
+![Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
+
+
+# SD card partitioning
+
 This is a discussion on how to partition an SD card on Linux using parted.  
 (Note that partition type 0x7f is reserved for experimental use.)
 
