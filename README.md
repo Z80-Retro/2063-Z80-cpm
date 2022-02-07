@@ -3,9 +3,9 @@ An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/joh
 
 ## Resources
 
-* ![Simplified SD card specification](https://www.sdcard.org/downloads/pls/)
-* ![Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
-* ![Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
+* [Simplified SD card specification](https://www.sdcard.org/downloads/pls/)
+* [Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
+* [Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
 
 
 # SD card partitioning
@@ -159,4 +159,4 @@ at block number 0 (where the MBR is) or into any partition from their respective
 
 ## Boot a Hello World! app from the SD card
 
-See the code in ![./hello](/hello) to create a program that will load and run from the SD card.
+See the code in [./hello](/hello) to create a program that will load and run from the SD card.
