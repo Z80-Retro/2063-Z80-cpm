@@ -1,7 +1,6 @@
 # 2063-Z80-cpm
 An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/johnwinans/2063-Z80)
 
-
 This is a discussion on how to partition an SD card on Linux using parted.  
 (Note that partition type 0x7f is reserved for experimental use.)
 
@@ -10,19 +9,22 @@ signature to indicate their geometry.  So it is unlikely that any
 CP/M filesystem will be readable by any system unl;ess it has its
 configuration hard-coded!
 
-	sudo parted /dev/sda
-
 To create a disk for hacking, it is likely best to create a partition 
-for the CP/M drives of type 0x7f that is `16*8*1024*1024` bytes in size 
-(128MiB.)  (The idea being that one partition could hold 16, 8MB disks.)
+for the CP/M drives of type `0x7f` that is `16*8*1024*1024` bytes in size 
+(128MiB.)  (The idea being that one partition could hold 16, 8MiB disks.)
 
-DANGER!!  THE FOLLOWING CAN CAUSE CATESTROPHIC DATA LOSS TO YOUR ENTIRE
+## Danger Will Robinson!
+
+DANGER!!  THE FOLLOWING CAN CAUSE CATASTROPHIC DATA LOSS TO YOUR ENTIRE
 SYSTEM!... NOT JUST THE SD CARD!
 
 Before doing anything discussed here, make VERY sure that you know what the 
-name of your SD card is on the system you are running the following commands.  
+name of your SD card is on the system you are running the following commands. 
+
 On a Raspberry PI, with a USB-SD card adapter, the SD card in the adapter 
 (as opposed to the one running the PI) is *PROBABLY* called `/dev/sda`.
+
+## Erase(ish) your SD card
 
 First, wipe out any existing MBR.  Doing so will effectively 're-format' your SD card.
 Do *NOT* expect that you will be able to recover any data after doing this!
@@ -31,6 +33,8 @@ On my raspberry PI, with only one SD adapter plugged into a USB port, I use the
 following command:
 
 	sudo dd if=/dev/zero of=/dev/sda bs=512 count=10
+
+## Partition your SD card
 
 Once that is completed, the `parted` command can be used to create a partition.
 
@@ -53,7 +57,9 @@ This partioning is not optiomal, but should suffice.  (At some point,
 I will write a simple C prog to emit a minimal MBR with a type 0x7F
 partion in it.)
 
-After creating the MBR, you can look at it using `hexdumpo -C`
+## Inspect the MBR
+
+After creating the MBR, you can look at it using `hexdump -C`
 
 	sudo dd if=/dev/sda bs=512 count=1 2>/dev/null | hexdump -C       
 
@@ -78,9 +84,9 @@ The four partition entries start at offset 0x000001be:
 	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
-	00			= inactive (not bootable)
+	00          = inactive (not bootable)
 	20 21 00    = CHS of the first sector (don't care)
-	83			= partition type (0x83 = Linux = probably not a good idea)
+	83          = partition type (0x83 = Linux = probably not a good idea)
 	71 21 10    = CHS of the last sector (don't care)
 	00 08 00 00 = LBA of first sector (1,048,576 = 0x800 * 0x200)
 	00 00 04 00 = number of sectors in the partition (0x040000 = 262144, 262144*512 = 134217728 = 128MiB)
@@ -95,7 +101,10 @@ At this point, Liunux should recognize that the drive has one partition on it:
 
 `/dev/sda1` is a view of only partion 1.
 
+## Write test data into the partition
+
 If we write "Hello world!" into partition 1:
+
 	echo "Hello world!" | sudo dd of=/dev/sda1 bs=512
 
 ...then we can see it by looking at the raw disk image:
@@ -130,11 +139,15 @@ If we write "Hello world!" into partition 1:
 	*
 	00465000
 
-Note that from the perspective of the whole drive, the string starts at 0x00100000
-and from the perspective of the partition, it starts at 0x00000000.
+Note that from the perspective of the whole drive, the string starts at `0x00100000`
+and from the perspective of the partition, it starts at `0x00000000`.
 
-Recall that partition 1 starts at LBA  block number 0x800, which is at byte offset 
+Recall that partition 1 starts at LBA  block number `0x800`, which is at byte offset 
 `0x800*0x200 = 0x00100000` from the start of the raw disk image.
 
 Therefore, we can use `dd` to copy raw binary images into either the entire drive starting
 at block number 0 (where the MBR is) or into any partition from their respective begining.
+
+## Boot a Hello World! app from the SD card
+
+See the code in ![./hello](/hello) to create a program that will load and run from the SD card.
