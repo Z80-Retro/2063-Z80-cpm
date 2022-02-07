@@ -3,9 +3,9 @@ An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/joh
 
 ## Resources
 
-![Simplified SD card specification](https://www.sdcard.org/downloads/pls/)
-![Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
-![Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
+* ![Simplified SD card specification](https://www.sdcard.org/downloads/pls/)
+* ![Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
+* ![Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
 
 
 # SD card partitioning
