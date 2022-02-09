@@ -142,7 +142,7 @@ boot_sd_2:
 
 ; After power cycle, card is in 3.3V signaling mode.  We do not intend 
 ; to change it nor we we care about what other options may be available.
-;	ld		de,load_base
+;	ld	de,load_base
 ;	call	sd_cmd58		; cmd58 = read OCR (operation conditions register)
 
 
