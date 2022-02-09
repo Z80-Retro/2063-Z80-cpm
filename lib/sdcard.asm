@@ -28,16 +28,16 @@ sd_debug: equ 0
 ; Calls spi_read8 (see for clobbers)
 ; Clobbers A, B, DE
 ;############################################################################
-spi_read_r1:
+sd_read_r1:
 	;ld	b,10
 	ld	b,0xf0
-spi_r1_loop:
+sd_r1_loop:
 	call	spi_read8
 	ld	e,a
 	and	0x80
-	jr	z,spi_r1_done
-	djnz	spi_r1_loop
-spi_r1_done:
+	jr	z,sd_r1_done
+	djnz	sd_r1_loop
+sd_r1_done:
 	ld	a,e
 	ret
 
@@ -45,10 +45,10 @@ spi_r1_done:
 ;############################################################################
 ; Read an R7 message into the 5-byte buffer pointed to by HL.
 ; Clobbers HL.
-; Calls spi_read_r1 and spi_read8
+; Calls sd_read_r1 and spi_read8
 ;############################################################################
-spi_read_r7:
-	call	spi_read_r1
+sd_read_r7:
+	call	sd_read_r1
 	ld	(hl),a
 	inc	hl
 	call	spi_read8
@@ -86,7 +86,7 @@ sd_boot1:
 ; HL = command buffer address
 ; B = command byte length
 ; Clobbers A, B, HL
-; Calls spi_write8, spi_ssel_true, spi_write_str, spi_read_r1, spi_ssel_false
+; Calls spi_write8, spi_ssel_true, spi_write_str, sd_read_r1, spi_ssel_false
 ; Returns A = reply message
 ;
 ; Modus operandi
@@ -115,7 +115,7 @@ sd_cmd_r1:
 	call    spi_write_str
 
 	; read the R1 response message
-	call    spi_read_r1
+	call    sd_read_r1
 	push	af
 
 	; de-assert the SSEL line
@@ -146,7 +146,7 @@ sd_cmd_r7:
 
 	; read the R1 response message
 	pop	hl			; pop the response buffer length into HL
-	call    spi_read_r7
+	call    sd_read_r7
 
 	; de-assert the SSEL line
 	call    spi_ssel_false
@@ -161,13 +161,13 @@ sd_cmd_r7:
 ; Return the response byte in A.
 ;##############################################################
 sd_cmd0:
-	ld	hl,spi_cmd0
-	ld	b,spi_cmd0_len
+	ld	hl,sd_cmd0_buf
+	ld	b,sd_cmd0_len
 	call	sd_cmd_r1
 
 if sd_debug
 	push	af
-	ld	hl,spi_cmd0_str
+	ld	hl,sd_cmd0_str
 	call	pstr
 	pop	af
 	call	hexdump_a		; dump the reply message
@@ -176,10 +176,10 @@ endif
 
 	ret
 
-spi_cmd0:	defb	0|0x40,0,0,0,0,0x94|0x01
-spi_cmd0_len:	equ	$-spi_cmd0
+sd_cmd0_buf:	defb	0|0x40,0,0,0,0,0x94|0x01
+sd_cmd0_len:	equ	$-sd_cmd0_buf
 if sd_debug
-spi_cmd0_str:	defb	'CMD0: \0'
+sd_cmd0_str:	defb	'CMD0: \0'
 endif
 
 
@@ -193,12 +193,12 @@ if sd_debug
 	push	de			; PUSH buffer address
 endif
 
-	ld	hl,spi_cmd8
-	ld	b,spi_cmd8_len
+	ld	hl,sd_cmd8_buf
+	ld	b,sd_cmd8_len
 	call	sd_cmd_r7
 
 if sd_debug
-	ld	hl,spi_cmd8_str
+	ld	hl,sd_cmd8_str
 	call	pstr
 	pop	hl			; POP buffer address
 	ld	bc,5
@@ -209,10 +209,10 @@ endif
 
 	ret
 
-spi_cmd8:	defb	8|0x40,0,0,0x01,0xaa,0x86|0x01
-spi_cmd8_len:	equ	$-spi_cmd8
+sd_cmd8_buf:	defb	8|0x40,0,0,0x01,0xaa,0x86|0x01
+sd_cmd8_len:	equ	$-sd_cmd8_buf
 if sd_debug
-spi_cmd8_str:	defb	'CMD8: \0'
+sd_cmd8_str:	defb	'CMD8: \0'
 endif
 
 
@@ -225,12 +225,12 @@ if sd_debug
 	push	de			; PUSH buffer address
 endif
 
-	ld	hl,spi_cmd58
-	ld	b,spi_cmd58_len
+	ld	hl,sd_cmd58_buf
+	ld	b,sd_cmd58_len
 	call	sd_cmd_r7
 
 if sd_debug
-	ld	hl,spi_cmd58_str
+	ld	hl,sd_cmd58_str
 	call	pstr
 	pop	hl			; POP buffer address
 	ld	bc,5
@@ -241,10 +241,10 @@ endif
 
 	ret
 
-spi_cmd58:	defb	58|0x40,0,0,0,0,0x00|0x01
-spi_cmd58_len:	equ	$-spi_cmd58
+sd_cmd58_buf:	defb	58|0x40,0,0,0,0,0x00|0x01
+sd_cmd58_len:	equ	$-sd_cmd58_buf
 if sd_debug
-spi_cmd58_str:	defb	'CMD58: \0'
+sd_cmd58_str:	defb	'CMD58: \0'
 endif
 
 
@@ -253,13 +253,13 @@ endif
 ; Return the 5-byte response in the buffer pointed to by DE. 
 ;############################################################################
 sd_cmd55:
-	ld	hl,spi_cmd55
-	ld	b,spi_cmd55_len
+	ld	hl,sd_cmd55_buf
+	ld	b,sd_cmd55_len
 	call	sd_cmd_r1
 
 if sd_debug
 	push	af
-	ld	hl,spi_cmd55_str
+	ld	hl,sd_cmd55_str
 	call	pstr
 	pop	af
 	call	hexdump_a	; dump the response byte
@@ -268,10 +268,10 @@ endif
 
 	ret
 
-spi_cmd55:	defb	55|0x40,0,0,0,0,0x00|0x01
-spi_cmd55_len:	equ	$-spi_cmd55
+sd_cmd55_buf:	defb	55|0x40,0,0,0,0,0x00|0x01
+sd_cmd55_len:	equ	$-sd_cmd55_buf
 if sd_debug
-spi_cmd55_str:	defb	'CMD55: \0'
+sd_cmd55_str:	defb	'CMD55: \0'
 endif
 
 
@@ -284,13 +284,13 @@ sd_acmd41:
 	call	sd_cmd55
 	pop	de
 	
-	ld	hl,spi_acmd41
-	ld	b,spi_acmd41_len
+	ld	hl,sd_acmd41_buf
+	ld	b,sd_acmd41_len
 	call	sd_cmd_r1
 
 if sd_debug
 	push	af
-	ld	hl,spi_acmd41_str
+	ld	hl,sd_acmd41_str
 	call	pstr
 	pop	af
 	push	af
@@ -305,10 +305,10 @@ endif
 ; Notes on Internet mention setting HCS and a bit.
 ; Notes on Internet about setting the supply voltage in ACMD41. But not in SPI mode?
 
-spi_acmd41:	defb	41|0x40,0x40,0,0,0,0x00|0x01	; Note the HCS flag is set here
-spi_acmd41_len:	equ	$-spi_acmd41
+sd_acmd41_buf:	defb	41|0x40,0x40,0,0,0,0x00|0x01	; Note the HCS flag is set here
+sd_acmd41_len:	equ	$-sd_acmd41_buf
 if sd_debug
-spi_acmd41_str:	defb	'ACMD41: \0'
+sd_acmd41_str:	defb	'ACMD41: \0'
 endif
 
 
@@ -319,7 +319,7 @@ endif
 ;############################################################################
 sd_reset:
 	;call	sd_boot
-	call	spi_clk_dly
+	call	sd_clk_dly
 	call    sd_cmd0
 
 	ld      de,sd_scratch
@@ -352,16 +352,16 @@ sd_reset_done:
 ;############################################################################
 ; A hack to just supply clock for a while.
 ;############################################################################
-spi_clk_dly:
+sd_clk_dly:
 	push	de
 	push	hl
 	ld	hl,0x80
-spi_clk_dly1:
+sd_clk_dly1:
 	call	spi_read8
 	dec	hl
 	ld	a,h
 	or	l
-	jr	nz,spi_clk_dly1
+	jr	nz,sd_clk_dly1
 	pop	hl
 	pop	de
 	ret
@@ -386,8 +386,8 @@ sd_cmd17:
 	push	iy			; +6
 
 	; make room for the command buffer
-spi_cmd17_len:	equ	6
-	ld	iy,-spi_cmd17_len
+sd_cmd17_len:	equ	6
+	ld	iy,-sd_cmd17_len
 	add	iy,sp			; iy = &cmd_buffer
 	ld	sp,iy
 
@@ -404,16 +404,16 @@ spi_cmd17_len:	equ	6
 
 if debug_cmd17
 	; print the comand buffer
-	ld	hl,spi_cmd17_str	; print dump heading 
+	ld	hl,sd_cmd17_str	; print dump heading 
 	call	pstr
 	push	iy
 	pop	hl			; hl = &cmd_buffer
-	ld	b,spi_cmd17_len
+	ld	b,sd_cmd17_len
 	call	hexdump_c
 ;	call	puts_crlf
 	
 	; print the target address
-	ld	hl,spi_cmd17_trg	; print dump heading 
+	ld	hl,sd_cmd17_trg	; print dump heading 
 	call	pstr
 	ld	a,(iy+11)
 	call	hexdump_a
@@ -428,11 +428,11 @@ endif
 	; send the command 
 	push	iy
 	pop	hl			; hl = iy = &cmd_buffer
-	ld	b,spi_cmd17_len
+	ld	b,sd_cmd17_len
 	call    spi_write_str		; clobbers A, BC, D, HL
 
 	; read the R1 response message
-	call    spi_read_r1		; clobbers A, B, DE
+	call    sd_read_r1		; clobbers A, B, DE
 
 	; If R1 status != SD_READY (0x00) then error
 ;	or	a			; if (a == 0x00) then is OK
@@ -450,15 +450,15 @@ endif
 
 if debug_cmd17
 	; print the command buffer
-	ld	hl,spi_cmd17_str	; print dump heading 
+	ld	hl,sd_cmd17_str	; print dump heading 
 	call	pstr
 	push	iy
 	pop	hl			; hl = &cmd_buffer
-	ld	b,spi_cmd17_len
+	ld	b,sd_cmd17_len
 	call	hexdump_c
 
 	; print the target address
-	ld	hl,spi_cmd17_trg	; print dump heading 
+	ld	hl,sd_cmd17_trg	; print dump heading 
 	call	pstr
 	ld	a,(iy+11)
 	call	hexdump_a
@@ -531,7 +531,7 @@ endif
 	xor	a			; A = 0 = success!
 
 sd_cmd17_done:
-	ld	iy,spi_cmd17_len
+	ld	iy,sd_cmd17_len
 	add	iy,sp
 	ld	sp,iy
 	pop	iy
@@ -548,8 +548,8 @@ sd_cmd17_err:
 
 
 if 1; debug_cmd17
-spi_cmd17_str:		defb	'CMD17: \r\n\0'
-spi_cmd17_trg:		defb	'Target: \0'
+sd_cmd17_str:		defb	'CMD17: \r\n\0'
+sd_cmd17_trg:		defb	'Target: \0'
 endif
 
 
@@ -577,7 +577,7 @@ sd_cmd24:
 	ld	ix,10
 	add	ix,sp			; ix = uint32_t sd_lba_block
 
-spi_cmd24_len: equ	6
+sd_cmd24_len: equ	6
 
 	ld	(iy+0),24|0x40		; the command byte
 	ld	a,(ix+3)		; stack = little endian
@@ -596,7 +596,7 @@ if debug_cmd24
 	defb	"  CMD24: \0"
 	push	iy
 	pop	hl			; hl = &cmd_buffer
-	ld	b,spi_cmd24_len
+	ld	b,sd_cmd24_len
 	call	hexdump_c
 
 	; print the target address
@@ -615,11 +615,11 @@ endif
 	; send the command 
 	push	iy
 	pop	hl			; hl = iy = &cmd_buffer
-	ld	b,spi_cmd24_len
+	ld	b,sd_cmd24_len
 	call	spi_write_str		; clobbers A, BC, D, HL
 
 	; read the R1 response message
-	call    spi_read_r1		; clobbers A, B, DE
+	call    sd_read_r1		; clobbers A, B, DE
 
 	; If R1 status != SD_READY (0x00) then error
 	or	a			; if (a == 0x00) 
