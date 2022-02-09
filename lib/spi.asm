@@ -29,18 +29,19 @@
 ; Data changes on falling CLK edge & sampled on rising CLK edge:
 ;        __                               ___
 ; /SSEL    \_____________________________/      Host --> SD
-;        _____    __    __    __    _________
-; CLK         \__/  \__/  \__/  \__/            Host --> SD
+;                 __    __    __    __
+; CLK    ________/  \__/  \__/  \__/  \______   Host --> SD
 ;        _____ _____ _____ _____ _____ ______
 ; MOSI        \_____X_____X_____X_____/         Host --> SD
 ;        _____ _____ _____ _____ _____ ______
 ; MISO        \_____X_____X_____X_____/         Host <-- SD
 ;
-; Use partition type 0x7F (reserved for experimental projects)?
 ;############################################################################
 
 ;############################################################################
 ; Write 8 bits in C to the SDCARD and discard the received data.
+; It is assumed that the gpio_out_cache value matches the current state
+; of the GP Output port and that SSEL is low.
 ; Clobbers: A, D
 ;############################################################################
 write1:	macro	bitpos
@@ -50,8 +51,8 @@ write1:	macro	bitpos
 	or	gpio_out_sd_mosi	; [7] prepare to transmit a 1 (only [4] if mask is in a reg)
 .lo_bit: ds 0				; for some reason, these labels disappear if there is no neumonic
 	out	(gpio_out),a		; set data value & CLK falling edge
-	or	gpio_out_sd_clk		; set the CLK bit
-	out	(gpio_out),a		; CLK rising edge
+	or	gpio_out_sd_clk		; ready the CLK to send a 1
+	out	(gpio_out),a		; set the CLK's rising edge
 	endm
 
 spi_write8:
@@ -61,14 +62,15 @@ spi_write8:
 
 	;--------- bit 7
 	; special case for the first bit (a already has the gpio_out value)
-	bit	7,c
-	jr	z,lo7
-	or	gpio_out_sd_mosi
+	bit	7,c			; check the value of the bit to send
+	jr	z,lo7			; if sending 0, then A is already prepared
+	or	gpio_out_sd_mosi	; else set the bit to send to 1
 lo7:
-	out	(gpio_out),a		; set data value & CLK falling edge
-	or	gpio_out_sd_clk		; set the CLK bit
-	out	(gpio_out),a		; CLK rising edge
+	out	(gpio_out),a		; set data value & CLK falling edge together
+	or	gpio_out_sd_clk		; ready the CLK to send a 1
+	out	(gpio_out),a		; set the CLK's rising edge
 
+	; send the other 7 bits
 	write1	6
 	write1	5
 	write1	4
@@ -90,22 +92,23 @@ read1:	macro
 	out	(gpio_out),a		; CLK rising edge
 
 	in	a,(gpio_in)		; read MISO
-	and	gpio_in_sd_miso
-	or	e
-	rlca
-	ld	e,a
+	and	gpio_in_sd_miso		; strip all but the MISO bit 
+	or	e			; accumulate the current MISO value
+	rlca				; The LSB is read last, rotate into proper place 
+	ld	e,a			; save a copy of the running value in A and E
 	endm
 
 ;XXX consider moving this per-byte overhead into the caller????    XXX
 
 spi_read8:
-	ld	e,0					; E = 0
+	ld	e,0			; prepare to accumulate the bits into E
 
 	ld	a,(gpio_out_cache)	; get current gpio_out value
 	and	~gpio_out_sd_clk	; CLK = 0
 	or	gpio_out_sd_mosi	; MOSI = 1
 	ld	d,a			; save in D for reuse
 
+	; read the 8 bits
 	read1	;7
 	read1	;6
 	read1	;5
@@ -115,19 +118,20 @@ spi_read8:
 	read1	;1
 	read1	;0
 
+	; The final value will be in both the E and A registers
+
 	ret
 
 ;##############################################################
 ; Assert the select line (set it low)
+; This will leave: SSEL=0, CLK=0, MOSI=1
 ; Clobbers A
 ;##############################################################
 spi_ssel_true:
-	push	bc
 	push	de
 
-	; send in a byte of 'nothing'
-	ld      c,0xff
-	call    spi_write8
+	; read and discard a byte to generate 8 clk cycles
+	call	spi_read8
 
 	ld	a,(gpio_out_cache)
 
@@ -138,28 +142,27 @@ spi_ssel_true:
 
 	; enable the card
 	and	~gpio_out_sd_ssel		; SSEL = 0
-	ld	(gpio_out_cache),a
+	ld	(gpio_out_cache),a		; save current state in the cache
 	out	(gpio_out),a
 
-	; send in a byte of 'nothing'	
-	ld      c,0xff
-	call    spi_write8
+	; generate another 8 clk cycles
+	call	spi_read8
 
 	pop	de
-	pop	bc
 	ret
 
 ;##############################################################
 ; de-assert the select line (set it high)
+; This will leave: SSEL=1, CLK=0, MOSI=1
 ; Clobbers A
 ;
 ; See section 4 of 
 ;	Physical Layer Simplified Specification Version 8.00
 ;##############################################################
 spi_ssel_false:
-	push	de
+	push	de		; save DE because read8 alters it
 
-	; send in a byte of 'nothing'	
+	; read and discard a byte to generate 8 clk cycles
 	call	spi_read8
 
 	ld	a,(gpio_out_cache)
@@ -172,7 +175,7 @@ spi_ssel_false:
 	ld	(gpio_out_cache),a
 	out	(gpio_out),a
 
-	; send two bytes of 'nothing'	
+	; generate another 16 clk cycles
 	call	spi_read8
 	call	spi_read8
 
@@ -213,9 +216,9 @@ endif
 ; clobbers: A, BC, D, HL
 ;##############################################################
 spi_write_str:
-	ld	c,(hl)
-	call	spi_write8
-	inc	hl
-	djnz	spi_write_str
+	ld	c,(hl)		; get next byte to send
+	call	spi_write8	; send it
+	inc	hl		; point to the next byte
+	djnz	spi_write_str	; count the byte & continue of not done
 	ret
 

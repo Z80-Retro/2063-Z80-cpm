@@ -92,9 +92,12 @@ done_msg:
 
 
 ;##############################################################################
-; Load 32K from the first blocks of partition 1 on the SD card into
+; Load 16K from the first blocks of partition 1 on the SD card into
 ; memory starting at 'load_base' and jump to it.
 ; If reading the SD card should fail then this function will return.
+;
+; TODO: Sanity-check the partition type, size and design some sort of 
+; signature that can be used to recognize the SD card partition as viable.
 ;##############################################################################
 boot_sd:
 	call	iputs
