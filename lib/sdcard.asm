@@ -24,60 +24,55 @@ sd_debug: equ 0
 
 ;############################################################################
 ; Read bytes until we find one with MSB = 0 or bail out retrying.
-; Return last read byte in A.
+; Return last read byte in A (and a copy also in E)
 ; Calls spi_read8 (see for clobbers)
 ; Clobbers A, B, DE
 ;############################################################################
 sd_read_r1:
-	;ld	b,10
-	ld	b,0xf0
+	ld	b,0xf0		; B = number of retries
 sd_r1_loop:
-	call	spi_read8
-	ld	e,a
-	and	0x80
-	jr	z,sd_r1_done
-	djnz	sd_r1_loop
+	call	spi_read8	; read a byte into A (and a copy in E as well)
+	and	0x80		; Is the MSB set to 1?
+	jr	z,sd_r1_done	; If MSB=0 then we are done
+	djnz	sd_r1_loop	; else try again until the retry count runs out
 sd_r1_done:
-	ld	a,e
+	ld	a,e		; copy the final value into A
 	ret
 
 
 ;############################################################################
 ; Read an R7 message into the 5-byte buffer pointed to by HL.
-; Clobbers HL.
-; Calls sd_read_r1 and spi_read8
+; Clobbers A, B, DE, HL
 ;############################################################################
 sd_read_r7:
-	call	sd_read_r1
-	ld	(hl),a
-	inc	hl
-	call	spi_read8
-	ld	(hl),a
-	inc	hl
-	call	spi_read8
-	ld	(hl),a
-	inc	hl
-	call	spi_read8
-	ld	(hl),a
-	inc	hl
-	call	spi_read8
-	ld	(hl),a
+	call	sd_read_r1	; A = byte #1
+	ld	(hl),a		; save it
+	inc	hl		; advance receive buffer pointer
+	call	spi_read8	; A = byte #2
+	ld	(hl),a		; save it
+	inc	hl		; advance receive buffer pointer
+	call	spi_read8	; A = byte #3
+	ld	(hl),a		; save it
+	inc	hl		; advance receive buffer pointer
+	call	spi_read8	; A = byte #4
+	ld	(hl),a		; save it
+	inc	hl		; advance receive buffer pointer
+	call	spi_read8	; A = byte #5
+	ld	(hl),a		; save it
 	ret
-
 
 
 ;##############################################################
 ; SSEL = HI (deassert)
 ; wait at least 1 msec after power up
-; send at least 74 SCLK rising edges
-; Clobbers A, D, B, and C
+; send at least 74 (80) SCLK rising edges
+; Clobbers A, DE, B
 ;##############################################################
 sd_boot:
-	ld	c,0xff
-	ld	b,10
+	ld	b,10		; 10*8 = 80 bits to read
 sd_boot1:
-	call	spi_write8
-	djnz	sd_boot1
+	call	spi_read8	; read 8 bits (causes 8 CLK xitions)
+	djnz	sd_boot1	; if not yet done, do another byte
 	ret
 
 
@@ -85,9 +80,8 @@ sd_boot1:
 ; Send a command and read an R1 response message.
 ; HL = command buffer address
 ; B = command byte length
-; Clobbers A, B, HL
-; Calls spi_write8, spi_ssel_true, spi_write_str, sd_read_r1, spi_ssel_false
-; Returns A = reply message
+; Clobbers A, BC, DE, HL
+; Returns A = reply message byte
 ;
 ; Modus operandi
 ; SSEL = LO (assert)
@@ -103,25 +97,19 @@ sd_boot1:
 ; SSEL = HI
 ;##############################################################
 sd_cmd_r1:
-	push	hl
-	push	bc
-
 	; assert the SSEL line
 	call    spi_ssel_true
 
 	; write a sequence of bytes represending the CMD message
-	pop	bc
-	pop	hl
-	call    spi_write_str
+	call    spi_write_str		; write B bytes from HL buffer @
 
 	; read the R1 response message
-	call    sd_read_r1
-	push	af
+	call    sd_read_r1		; A = E = message response byte
 
 	; de-assert the SSEL line
 	call    spi_ssel_false
 
-	pop	af
+	ld	a,e
 	ret
 
 
@@ -130,22 +118,16 @@ sd_cmd_r1:
 ; HL = command buffer address
 ; B = command byte length
 ; DE = 5-byte response buffer
+; Clobbers A, BC, DE, HL
 ;##############################################################
 sd_cmd_r7:
-	push	de
-	push	hl
-	push	bc
-
-	; assert the SSEL line
 	call    spi_ssel_true
 
-	; write a sequence of bytes represending the CMD message
-	pop	bc
-	pop	hl
-	call    spi_write_str
+	push	de			; save the response buffer @
+	call    spi_write_str		; write cmd buffer from HL, length=B
 
-	; read the R1 response message
-	pop	hl			; pop the response buffer length into HL
+	; read the response message into buffer @ in HL
+	pop	hl			; pop the response buffer @ HL
 	call    sd_read_r7
 
 	; de-assert the SSEL line
@@ -154,33 +136,31 @@ sd_cmd_r7:
 	ret
 
 
-
-
 ;##############################################################
 ; Send a CMD0 message and read the response.
 ; Return the response byte in A.
+; Clobbers A, BC, DE, HL
 ;##############################################################
 sd_cmd0:
-	ld	hl,sd_cmd0_buf
-	ld	b,sd_cmd0_len
-	call	sd_cmd_r1
+	ld	hl,sd_cmd0_buf		; HL = command buffer
+	ld	b,sd_cmd0_len		; B = command buffer length
+	call	sd_cmd_r1		; send CMD0, A=response byte
 
 if sd_debug
 	push	af
-	ld	hl,sd_cmd0_str
-	call	pstr
+	call	iputs
+	db	'CMD0: \0'
 	pop	af
+	push	af
 	call	hexdump_a		; dump the reply message
 	call    puts_crlf
+	pop	af
 endif
 
 	ret
 
 sd_cmd0_buf:	defb	0|0x40,0,0,0,0,0x94|0x01
 sd_cmd0_len:	equ	$-sd_cmd0_buf
-if sd_debug
-sd_cmd0_str:	defb	'CMD0: \0'
-endif
 
 
 ;##############################################################
@@ -198,8 +178,8 @@ endif
 	call	sd_cmd_r7
 
 if sd_debug
-	ld	hl,sd_cmd8_str
-	call	pstr
+	call	iputs
+	db	'CMD8: \0'
 	pop	hl			; POP buffer address
 	ld	bc,5
 	ld	e,0
@@ -211,9 +191,6 @@ endif
 
 sd_cmd8_buf:	defb	8|0x40,0,0,0x01,0xaa,0x86|0x01
 sd_cmd8_len:	equ	$-sd_cmd8_buf
-if sd_debug
-sd_cmd8_str:	defb	'CMD8: \0'
-endif
 
 
 ;##############################################################
@@ -230,8 +207,8 @@ endif
 	call	sd_cmd_r7
 
 if sd_debug
-	ld	hl,sd_cmd58_str
-	call	pstr
+	call	iputs
+	db	'CMD58: \0'
 	pop	hl			; POP buffer address
 	ld	bc,5
 	ld	e,0
@@ -243,36 +220,32 @@ endif
 
 sd_cmd58_buf:	defb	58|0x40,0,0,0,0,0x00|0x01
 sd_cmd58_len:	equ	$-sd_cmd58_buf
-if sd_debug
-sd_cmd58_str:	defb	'CMD58: \0'
-endif
 
 
 ;############################################################################
 ; Send a CMD55 message and read the response.
-; Return the 5-byte response in the buffer pointed to by DE. 
+; Return the 1-byte response in A
 ;############################################################################
 sd_cmd55:
-	ld	hl,sd_cmd55_buf
-	ld	b,sd_cmd55_len
-	call	sd_cmd_r1
+	ld	hl,sd_cmd55_buf	; HL = buffer to write
+	ld	b,sd_cmd55_len	; B = buffer byte count
+	call	sd_cmd_r1	; write buffer, A = R1 response byte
 
 if sd_debug
 	push	af
-	ld	hl,sd_cmd55_str
-	call	pstr
+	call	iputs
+	db	'CMD55: \0'
 	pop	af
+	push	af
 	call	hexdump_a	; dump the response byte
 	call    puts_crlf
+	pop	af
 endif
 
 	ret
 
 sd_cmd55_buf:	defb	55|0x40,0,0,0,0,0x00|0x01
 sd_cmd55_len:	equ	$-sd_cmd55_buf
-if sd_debug
-sd_cmd55_str:	defb	'CMD55: \0'
-endif
 
 
 ;############################################################################
@@ -280,18 +253,16 @@ endif
 ; Note that A-commands are prefixed with a CMD55.
 ;############################################################################
 sd_acmd41:
-	push	de
-	call	sd_cmd55
-	pop	de
-	
-	ld	hl,sd_acmd41_buf
-	ld	b,sd_acmd41_len
+	call	sd_cmd55		; send the A-command prefix
+
+	ld	hl,sd_acmd41_buf	; HL = command buffer
+	ld	b,sd_acmd41_len		; B = buffer byte count
 	call	sd_cmd_r1
 
 if sd_debug
 	push	af
-	ld	hl,sd_acmd41_str
-	call	pstr
+	call	iputs
+	db	'ACMD41: \0'
 	pop	af
 	push	af
 	call	hexdump_a	; dump the status byte
@@ -307,9 +278,6 @@ endif
 
 sd_acmd41_buf:	defb	41|0x40,0x40,0,0,0,0x00|0x01	; Note the HCS flag is set here
 sd_acmd41_len:	equ	$-sd_acmd41_buf
-if sd_debug
-sd_acmd41_str:	defb	'ACMD41: \0'
-endif
 
 
 
