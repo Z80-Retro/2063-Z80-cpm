@@ -416,6 +416,7 @@ rb_blk_msg:	defb	'Read Block: \0'
 
 
 include	'sdcard.asm'
+include	'spi.asm'
 include	'hexdump.asm'
 include 'sio.asm'
 include 'ctc1.asm'
