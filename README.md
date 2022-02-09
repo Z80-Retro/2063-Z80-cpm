@@ -16,12 +16,16 @@ This is a discussion on how to partition an SD card on Linux using parted.
 
 The problem with CP/M disks is that they do not include any sort of
 signature to indicate their geometry.  So it is unlikely that any
-CP/M filesystem will be readable by any system unl;ess it has its
+CP/M filesystem will be readable by any system unless it has its
 configuration hard-coded!
 
-To create a disk for hacking, it is likely best to create a partition 
+To create a disk for hacking, it would be nice to create a partition 
 for the CP/M drives of type `0x7f` that is `16*8*1024*1024` bytes in size 
 (128MiB.)  (The idea being that one partition could hold 16, 8MiB disks.)
+It is not obvious how to do this when using a simple partition editor.
+
+For now, we will ignore the partition type, mark it as inactive, and boot
+from the first partition.
 
 ## Danger Will Robinson!
 
