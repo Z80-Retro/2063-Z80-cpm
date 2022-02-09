@@ -83,7 +83,7 @@ hexdump1:
 
 ;#############################################################################
 ; Print the value in A in hex
-; Clobbers AF, BC
+; Clobbers C
 ;#############################################################################
 hexdump_a:
 	push	af
@@ -93,7 +93,11 @@ hexdump_a:
 	srl	a
 	call	hexdump_nib
 	pop	af
+	push	af
 	and	0x0f
+	call	hexdump_nib
+	pop	af
+	ret
 
 hexdump_nib:
 	add	'0'
