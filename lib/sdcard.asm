@@ -37,8 +37,6 @@ sd_debug: equ 0
 ;       _____ _____ _____ _____ _____ ______
 ; MOSI       \_____X_____X_____X_____/
 ;
-; Upon entry, SIO B will have been initialized for 9600 8N1.
-;
 ; Use partition type 0x7F (reserved for experimental projects)?
 ;############################################################################
 
