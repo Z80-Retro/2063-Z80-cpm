@@ -42,6 +42,7 @@
 ; Write 8 bits in C to the SDCARD and discard the received data.
 ; It is assumed that the gpio_out_cache value matches the current state
 ; of the GP Output port and that SSEL is low.
+; This will leave: CLK=1, MOSI=(the LSB of the byte written)
 ; Clobbers: A, D
 ;############################################################################
 write1:	macro	bitpos
@@ -82,8 +83,11 @@ lo7:
 	ret
 
 ;############################################################################
-; Read 8 bits from the SPI & return it in A
-; Clobbers D and E
+; Read 8 bits from the SPI & return it in A.
+; MOSI will be set to 1 during all bit transfers.
+; This will leave: CLK=1, MOSI=1
+; Clobbers A, D and E
+; Returns the byte read in the A (and a copy of it also in E)
 ;############################################################################
 read1:	macro
 	ld	a,d
@@ -95,6 +99,7 @@ read1:	macro
 	and	gpio_in_sd_miso		; strip all but the MISO bit 
 	or	e			; accumulate the current MISO value
 	rlca				; The LSB is read last, rotate into proper place 
+					; NOTE: note this only works because gpio_in_sd_miso = 0x80
 	ld	e,a			; save a copy of the running value in A and E
 	endm
 
