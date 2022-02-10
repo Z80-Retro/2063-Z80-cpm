@@ -27,14 +27,14 @@
 ;
 ; SD cards operate on SPI mode 0.
 ; Data changes on falling CLK edge & sampled on rising CLK edge:
-;        __                               ___
-; /SSEL    \_____________________________/      Host --> SD
-;                 __    __    __    __
-; CLK    ________/  \__/  \__/  \__/  \______   Host --> SD
-;        _____ _____ _____ _____ _____ ______
-; MOSI        \_____X_____X_____X_____/         Host --> SD
-;        _____ _____ _____ _____ _____ ______
-; MISO        \_____X_____X_____X_____/         Host <-- SD
+;        __                                             ___
+; /SSEL    \______________________ ... ________________/      Host --> SD
+;                 __    __    __   ... _    __    __
+; CLK    ________/  \__/  \__/  \__     \__/  \__/  \______   Host --> SD
+;        _____ _____ _____ _____ _     _ _____ _____ ______
+; MOSI        \_____X_____X_____X_ ... _X_____X_____/         Host --> SD
+;        _____ _____ _____ _____ _     _ _____ _____ ______
+; MISO        \_____X_____X_____X_ ... _X_____X_____/         Host <-- SD
 ;
 ;############################################################################
 
@@ -45,7 +45,7 @@
 ; This will leave: CLK=1, MOSI=(the LSB of the byte written)
 ; Clobbers: A, D
 ;############################################################################
-write1:	macro	bitpos
+spi_write1:	macro	bitpos
 	ld	a,d			; a = gpio_out value w/CLK & MOSI = 0
 	bit	bitpos,c		; [8] is the bit of C a 1?
 	jr	z,.lo_bit		; [7/12] (transmit a 0)
@@ -64,21 +64,21 @@ spi_write8:
 	;--------- bit 7
 	; special case for the first bit (a already has the gpio_out value)
 	bit	7,c			; check the value of the bit to send
-	jr	z,lo7			; if sending 0, then A is already prepared
+	jr	z,spi_lo7		; if sending 0, then A is already prepared
 	or	gpio_out_sd_mosi	; else set the bit to send to 1
-lo7:
+spi_lo7:
 	out	(gpio_out),a		; set data value & CLK falling edge together
 	or	gpio_out_sd_clk		; ready the CLK to send a 1
 	out	(gpio_out),a		; set the CLK's rising edge
 
 	; send the other 7 bits
-	write1	6
-	write1	5
-	write1	4
-	write1	3
-	write1	2
-	write1	1
-	write1	0
+	spi_write1	6
+	spi_write1	5
+	spi_write1	4
+	spi_write1	3
+	spi_write1	2
+	spi_write1	1
+	spi_write1	0
 
 	ret
 
@@ -89,7 +89,7 @@ lo7:
 ; Clobbers A, D and E
 ; Returns the byte read in the A (and a copy of it also in E)
 ;############################################################################
-read1:	macro
+spi_read1:	macro
 	ld	a,d
 	out	(gpio_out),a		; set data value & CLK falling edge
 	or	gpio_out_sd_clk		; set the CLK bit
@@ -114,14 +114,14 @@ spi_read8:
 	ld	d,a			; save in D for reuse
 
 	; read the 8 bits
-	read1	;7
-	read1	;6
-	read1	;5
-	read1	;4
-	read1	;3
-	read1	;2
-	read1	;1
-	read1	;0
+	spi_read1	;7
+	spi_read1	;6
+	spi_read1	;5
+	spi_read1	;4
+	spi_read1	;3
+	spi_read1	;2
+	spi_read1	;1
+	spi_read1	;0
 
 	; The final value will be in both the E and A registers
 
