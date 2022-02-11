@@ -69,8 +69,8 @@ stacktop:	equ	0
 	;call	test_bits		; test simple MOSI bit patterns
 	;call	test_read		; test MISO bit patterns
 
-	call	test_80clks		; required prior to a CMD0
-	call	test_cmd0		; see if we can wake up an SD card
+	;call	test_80clks		; required prior to a CMD0
+	;call	test_cmd0		; see if we can wake up an SD card
 
 	call	iputs
 	db	'\r\n\nTests done\r\n\0'

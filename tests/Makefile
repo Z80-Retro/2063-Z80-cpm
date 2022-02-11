@@ -1,6 +1,5 @@
 ASM_FLAGS=-I../lib
 
-
 all: spi_test.bin
 
 clean:
@@ -9,6 +8,7 @@ clean:
 
 DATE := $(shell date --rfc-3339=seconds)
 GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
+
 %.bin: %.asm
 	cat $< | sed -e "s/@@DATE@@/$(DATE)/g" -e "s/@@GIT_VERSION@@/$(GIT_VERSION)/g" | z80asm - -o $@ --list=$(basename $@).lst $(ASM_FLAGS)
 
