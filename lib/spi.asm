@@ -39,7 +39,7 @@
 ;############################################################################
 
 ;############################################################################
-; Write 8 bits in C to the SDCARD and discard the received data.
+; Write 8 bits in C to the SPI port and discard the received data.
 ; It is assumed that the gpio_out_cache value matches the current state
 ; of the GP Output port and that SSEL is low.
 ; This will leave: CLK=1, MOSI=(the LSB of the byte written)
