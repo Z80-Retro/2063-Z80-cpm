@@ -103,7 +103,7 @@ boot_sd:
 	call	iputs
 	db		'\r\nBooting SD card partition 1\r\n\n\0'
 
-	call	sd_boot
+	call	sd_boot		; transmit 74+ CLKs
 
 	; The response byte should be 0x01 (idle) from cmd0
 	call	sd_cmd0
@@ -142,10 +142,9 @@ boot_sd_2:
 
 ; After power cycle, card is in 3.3V signaling mode.  We do not intend 
 ; to change it nor we we care about what other options may be available.
+; XXX I don't care what voltages are supported... I assume that 3.3v is fine.
 ;	ld	de,load_base
 ;	call	sd_cmd58		; cmd58 = read OCR (operation conditions register)
-
-
 
 ac41_max_retry:	equ	0x80		; limit the number of acmd41 retries
 
@@ -185,21 +184,31 @@ if 0
 	db	' times.\r\n\0'
 endif
 
-	; XXX I don't care what voltages are supported... I assume that 3.3v is
-
-
 	; Find out the card capacity (HC or XC)
+	; This status is not valid until after ACMD41.
 	ld	de,load_base
 	call	sd_cmd58
 
-	; XXX I don't care what the capacity is.
+if 0
+	call	iputs
+	db	'** Note: Called CMD58: \0'
+	ld	hl,load_base
+	ld	bc,5
+	ld	e,0
+	call	hexdump
+endif
+
+	; Check that CCS=1 here to indicate that we have an HC/XC card
+	ld	a,(load_base+1)
+	and	0x40			; CCS bit is here (See spec p275)
+	jr	nz,boot_hcxc_ok
+
+	call	iputs
+	db	'Error: SD card capacity is not HC or XC.\r\n\0'
+	ret
 
 
-
-
-
-
-
+boot_hcxc_ok:
 	; ############ Read the MBR ############
 
 	;call	spi_read8f_init		; this is needed for cmd17
