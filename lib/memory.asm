@@ -17,6 +17,8 @@
 ;    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
 ;    USA
 ;
+; https://github.com/johnwinans/2063-Z80-cpm
+;
 ;****************************************************************************
 
 ; Define the memory size to be used for the CP/M configuration

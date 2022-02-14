@@ -17,7 +17,26 @@
 ;    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
 ;    USA
 ;
+; https://github.com/johnwinans/2063-Z80-cpm
+;
 ;****************************************************************************
+
+;############################################################################
+;
+; An SD card library suitable for talking to SD cards in SPI mode 0.
+;
+; XXX As of 2022-02-14, this code has been tested on house-brand (Inland)
+; MicroCenter SD version 2.0 SDHC cards:
+;	https://www.microcenter.com/product/486146/micro-center-16gb-microsdhc-card-class-10-flash-memory-card-with-adapter
+;
+; WARNNING: SD cards are 3.3v ONLY!
+; Must provide a pull up on MISO to 3.3V.
+; SD cards operate on SPI mode 0.
+;
+; References:
+; - SD Simplified Specifications, Physical Layer Simplified Specification:
+; 	https://www.sdcard.org/downloads/pls/
+;############################################################################
 
 
 sd_debug: equ 0
@@ -91,7 +110,6 @@ sd_boot1:
 ; send arg 2
 ; send arg 3
 ; send CRC 
-
 ; wait for reply (MSB=0)
 ; read reply
 ; SSEL = HI
@@ -115,11 +133,13 @@ sd_cmd_r1:
 
 ;##############################################################
 ; Send a command and read an R7 response message.
+; Note that an R3 response is the same size, so can use the same code.
 ; HL = command buffer address
 ; B = command byte length
-; DE = 5-byte response buffer
+; DE = 5-byte response buffer address
 ; Clobbers A, BC, DE, HL
 ;##############################################################
+sd_cmd_r3:
 sd_cmd_r7:
 	call    spi_ssel_true
 
@@ -137,7 +157,7 @@ sd_cmd_r7:
 
 
 ;##############################################################
-; Send a CMD0 message and read the response.
+; Send a CMD0 message and read an R1 response.
 ; Return the response byte in A.
 ; Clobbers A, BC, DE, HL
 ;##############################################################
@@ -164,7 +184,7 @@ sd_cmd0_len:	equ	$-sd_cmd0_buf
 
 
 ;##############################################################
-; Send a CMD8 message and read the response.
+; Send a CMD8 message and read an R7 response.
 ; Return the 5-byte response in the buffer pointed to by DE.
 ; The response should be: 0x01 0x00 0x00 0x01 0xAA.
 ;##############################################################
@@ -194,7 +214,7 @@ sd_cmd8_len:	equ	$-sd_cmd8_buf
 
 
 ;##############################################################
-; Send a CMD58 message and read the response.
+; Send a CMD58 message and read an R3 response.
 ; Return the 5-byte response in the buffer pointed to by DE.
 ;##############################################################
 sd_cmd58:
@@ -204,7 +224,7 @@ endif
 
 	ld	hl,sd_cmd58_buf
 	ld	b,sd_cmd58_len
-	call	sd_cmd_r7
+	call	sd_cmd_r3
 
 if sd_debug
 	call	iputs
@@ -223,7 +243,7 @@ sd_cmd58_len:	equ	$-sd_cmd58_buf
 
 
 ;############################################################################
-; Send a CMD55 message and read the response.
+; Send a CMD55 message and read an R1 response.
 ; Return the 1-byte response in A
 ;############################################################################
 sd_cmd55:
@@ -249,7 +269,7 @@ sd_cmd55_len:	equ	$-sd_cmd55_buf
 
 
 ;############################################################################
-; Send a ACMD41 message and return the response byte in A.
+; Send a ACMD41 message and return an R1 response byte in A.
 ; Note that A-commands are prefixed with a CMD55.
 ;############################################################################
 sd_acmd41:
@@ -273,7 +293,7 @@ endif
 	ret
 
 
-; Notes on Internet mention setting HCS and a bit.
+; Notes on Internet mention setting HCS and a bit (Host Capacity Support) = HC/XC mode.
 ; Notes on Internet about setting the supply voltage in ACMD41. But not in SPI mode?
 
 sd_acmd41_buf:	defb	41|0x40,0x40,0,0,0,0x00|0x01	; Note the HCS flag is set here
@@ -283,18 +303,21 @@ sd_acmd41_len:	equ	$-sd_acmd41_buf
 
 ;############################################################################
 ; Get the SD card to wake up ready for block transfers.
-; XXX This is a hack added to let the BIOS reset everything.
+;
+; XXX This is a hack added to let the BIOS reset everything. XXX
+;
 ;############################################################################
 sd_reset:
 	;call	sd_boot
 	call	sd_clk_dly
+
 	call    sd_cmd0
 
 	ld      de,sd_scratch
 	call    sd_cmd8
 
-	ld      de,sd_scratch
-	call    sd_cmd58
+	;ld      de,sd_scratch
+	;call    sd_cmd58
 
 	ld      b,0x20          ; limit the number of retries here
 sd_reset_ac41:
@@ -338,6 +361,14 @@ sd_clk_dly1:
 ;############################################################################
 ; Read one block given by the 32-bit (little endian) number at 
 ; the top of the stack into the buffer given by address in DE.
+;
+; - set SSEL = true
+; - send command
+; - read for CMD ACK
+; - wait for 'data token'
+; - read data block
+; - read data CRC
+; - set SSEL = false
 ;
 ; A = 0 if the read operation was successful. Else A=1
 ; Clobbers A
@@ -527,6 +558,23 @@ endif
 ; Write one block given by the 32-bit (little endian) number at 
 ; the top of the stack from the buffer given by address in DE.
 ;
+; - set SSEL = true
+; - send command
+; - read for CMD ACK
+; - send 'data token'
+; - write data block
+; - wait while busy 
+; - read 'data response token' (must be 0bxxx00101 else errors) (see SD spec: 7.3.3.1, p281)
+; - set SSEL = false
+;
+; - set SSEL = true		
+; - wait while busy		Wait for the write operation to complete.
+; - set SSEL = false
+;
+; XXX This /should/ check to see if the block address was valid 
+; and that there was no write protect error by sending a CMD13
+; after the long busy wait has completed.
+;
 ; A = 0 if the write operation was successful. Else A = 1.
 ; Clobbers A
 ;##############################################################
@@ -617,7 +665,7 @@ sd_cmd24_r1ok:
 
 	ld	l,(ix-6)		; hl = source buffer address
 	ld	h,(ix-5)
-	ld	bc,0x200		; bc = 512 bytes to read
+	ld	bc,0x200		; bc = 512 bytes to write
 sd_cmd24_blk:
 	push	bc			; XXX speed this up
 	ld	c,(hl)

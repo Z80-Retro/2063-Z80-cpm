@@ -17,24 +17,23 @@
 ;    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
 ;    USA
 ;
+; https://github.com/johnwinans/2063-Z80-cpm
+;
 ;****************************************************************************
 
 ;############################################################################
-; An SD card library.
+; An SPI library suitable for tallking to SD cards.
 ;
-; SD cards are 3.3v ONLY!
-; Must provide a pull up on MISO.
-;
-; SD cards operate on SPI mode 0.
+; This library implements SPI mode 0 (SD cards operate on SPI mode 0.)
 ; Data changes on falling CLK edge & sampled on rising CLK edge:
 ;        __                                             ___
-; /SSEL    \______________________ ... ________________/      Host --> SD
+; /SSEL    \______________________ ... ________________/      Host --> Device
 ;                 __    __    __   ... _    __    __
-; CLK    ________/  \__/  \__/  \__     \__/  \__/  \______   Host --> SD
+; CLK    ________/  \__/  \__/  \__     \__/  \__/  \______   Host --> Device
 ;        _____ _____ _____ _____ _     _ _____ _____ ______
-; MOSI        \_____X_____X_____X_ ... _X_____X_____/         Host --> SD
+; MOSI        \_____X_____X_____X_ ... _X_____X_____/         Host --> Device
 ;        _____ _____ _____ _____ _     _ _____ _____ ______
-; MISO        \_____X_____X_____X_ ... _X_____X_____/         Host <-- SD
+; MISO        \_____X_____X_____X_ ... _X_____X_____/         Host <-- Device
 ;
 ;############################################################################
 
