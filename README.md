@@ -8,6 +8,9 @@ An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/joh
 * [Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
 * [Wikipedia SD card article](https://en.wikipedia.org/wiki/SD_card)
 
+Any SD/HC card should work for this project.  (According to the spec, and SD/XC card should work too.) The SD cards used to test this documentation were purchased from MicroCenter.  The specific cards I have been using are available here:
+
+* https://www.microcenter.com/product/486146/micro-center-16gb-microsdhc-card-class-10-flash-memory-card-with-adapter
 
 # SD card partitioning
 
