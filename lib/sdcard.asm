@@ -29,7 +29,7 @@
 ; MicroCenter SD version 2.0 SDHC cards:
 ;	https://www.microcenter.com/product/486146/micro-center-16gb-microsdhc-card-class-10-flash-memory-card-with-adapter
 ;
-; WARNNING: SD cards are 3.3v ONLY!
+; WARNING: SD cards are 3.3v ONLY!
 ; Must provide a pull up on MISO to 3.3V.
 ; SD cards operate on SPI mode 0.
 ;
