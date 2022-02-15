@@ -211,8 +211,6 @@ endif
 boot_hcxc_ok:
 	; ############ Read the MBR ############
 
-	;call	spi_read8f_init		; this is needed for cmd17
-
 	; push the starting block number onto the stack in litle-endian order
 	ld	hl,0			; SD card block number to read
 	push	hl			; high half

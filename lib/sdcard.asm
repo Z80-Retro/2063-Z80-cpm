@@ -34,8 +34,25 @@
 ; SD cards operate on SPI mode 0.
 ;
 ; References:
-; - SD Simplified Specifications, Physical Layer Simplified Specification:
-; 	https://www.sdcard.org/downloads/pls/
+; - SD Simplified Specifications, Physical Layer Simplified Specification, 
+;   Version 8.00:    https://www.sdcard.org/downloads/pls/
+;
+; The details on operating an SD card in SPI mode can be found in 
+; Section 7 of the SD specification, p242-264.
+;
+; To initialize an SDHC/SDXC card:
+; - send at least 74 CLKs
+; - send CMD0 & expect reply message = 0x01 (enter SPI mode)
+; - send CMD8 (establish that the host uses Version 2.0 SD SPI protocol)
+; - send ACMD41 (finish bringing the SD card on line)
+; - send CMD58 to verify the card is SDHC/SDXC mode (512-byte block size)
+;
+; At this point the card is on line and ready to read and write 
+; memory blocks.
+;
+; - use CMD17 to read one 512-byte block
+; - use CMD24 to write one 512-byte block
+;
 ;############################################################################
 
 
