@@ -1,6 +1,6 @@
 ASM_FLAGS=-I../lib
 
-all: spi_test.bin
+all: spi_test.bin sd_test.bin
 
 clean:
 	rm -f ldr
