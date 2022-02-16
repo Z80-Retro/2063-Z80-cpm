@@ -211,7 +211,7 @@ endif
 boot_hcxc_ok:
 	; ############ Read the MBR ############
 
-	; push the starting block number onto the stack in litle-endian order
+	; push the starting block number onto the stack in little-endian order
 	ld	hl,0			; SD card block number to read
 	push	hl			; high half
 	push	hl			; low half
