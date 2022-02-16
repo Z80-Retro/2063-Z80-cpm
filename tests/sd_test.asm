@@ -22,13 +22,12 @@
 debug:		equ	0		; Set to 1 to show debug printing, else 0 
 
 include	'io.asm'
+include	'memory.asm'
 
-load_base:	equ	0xc000		; Where to load the boot image from the SD card.
-load_blks:	equ	(0x10000-load_base)/512
+stacktop:	equ	LOAD_BASE	; So the SD loader does not overwrite!
 
-stacktop:	equ	load_base	; (so the SD loader does not overwrite)
 
-	org		0x0000		; Cold reset Z80 entry point.
+	org	0x0000			; Cold reset Z80 entry point.
 
 	;###################################################
 	; NOTE THAT THE SRAM IS NOT READABLE AT THIS POINT
@@ -81,7 +80,7 @@ halt_loop:
 boot_msg:
 	defb    '\r\n\n'
 	defb	'##############################################################################\r\n'
-	defb	'Z80 Retro Board 2063.3\r\n'
+	defb	'Z80 Retro Board 2063.3 -- sd_test.asm\r\n'
 	defb	'      git: @@GIT_VERSION@@\r\n'
 	defb	'    build: @@DATE@@\r\n'
 	defb	'\0'
@@ -93,12 +92,12 @@ done_msg:
 
 ;##############################################################################
 ; Load only the first block on the SD card into memory starting at 
-; 'load_base' and jump to it.
+; 'LOAD_BASE' and jump to it.
 ; If reading the SD card should fail then this function will return.
 ;##############################################################################
 boot_sd:
 	call	iputs
-	db		'\r\nReading SD card clobk zero\r\n\n\0'
+	db		'\r\nReading SD card block zero\r\n\n\0'
 
 	call	sd_boot		; transmit 74+ CLKs
 
@@ -112,13 +111,13 @@ boot_sd:
 	ret
 
 boot_sd_1:
-	ld	de,load_base	; Use the load area for a temporary buffer
+	ld	de,LOAD_BASE	; Use the load area for a temporary buffer
 	call	sd_cmd8		; CMD8 is sent to verify that we have a Version 2+ SD card
 				; and agree on the operating voltage.
 				; CMD8 also expands the functionality of CMD58 and ACMD41
 
 	; The response should be: 0x01 0x00 0x00 0x01 0xAA.
-	ld	a,(load_base)
+	ld	a,(LOAD_BASE)
 	cp	1
 	jr	z,boot_sd_2
 
@@ -126,7 +125,7 @@ boot_sd_1:
 	db	'Error: Can not read SD card (cmd8 command status not valid):\r\n\0'
 
 	; dump the command response buffer
-	ld	hl,load_base	; dump bytes from here
+	ld	hl,LOAD_BASE	; dump bytes from here
 	ld	e,0		; no fancy formatting
 	ld	bc,5		; dump 5 bytes
 	call	hexdump
@@ -140,7 +139,7 @@ boot_sd_2:
 ; After power cycle, card is in 3.3V signaling mode.  We do not intend 
 ; to change it nor we we care about what other options may be available.
 ; XXX I don't care what voltages are supported... I assume that 3.3v is fine.
-;	ld	de,load_base
+;	ld	de,LOAD_BASE
 ;	call	sd_cmd58		; cmd58 = read OCR (operation conditions register)
 
 ac41_max_retry:	equ	0x80		; limit the number of acmd41 retries
@@ -148,7 +147,7 @@ ac41_max_retry:	equ	0x80		; limit the number of acmd41 retries
 	ld	b,ac41_max_retry
 ac41_loop:
 	push	bc			; save BC since B contains the retry count 
-	ld	de,load_base		; store command response into load_base
+	ld	de,LOAD_BASE		; store command response into LOAD_BASE
 	call	sd_acmd41		; ask if the card is ready
 	pop	bc			; restore our retry counter
 	or	a			; check to see if A is zero
@@ -183,20 +182,20 @@ endif
 
 	; Find out the card capacity (HC or XC)
 	; This status is not valid until after ACMD41.
-	ld	de,load_base
+	ld	de,LOAD_BASE
 	call	sd_cmd58
 
 if 0
 	call	iputs
 	db	'** Note: Called CMD58: \0'
-	ld	hl,load_base
+	ld	hl,LOAD_BASE
 	ld	bc,5
 	ld	e,0
 	call	hexdump
 endif
 
 	; Check that CCS=1 here to indicate that we have an HC/XC card
-	ld	a,(load_base+1)
+	ld	a,(LOAD_BASE+1)
 	and	0x40			; CCS bit is here (See spec p275)
 	jr	nz,boot_hcxc_ok
 
@@ -206,21 +205,26 @@ endif
 
 
 boot_hcxc_ok:
-	; ############ Read block number zero into memory at 'load_base' ############
+	; ############ Read block number zero into memory at 'LOAD_BASE' ############
 
 	; push the starting block number onto the stack in little-endian order
 	ld	hl,0			; SD card block number to read
 	push	hl			; high half
 	push	hl			; low half
-	ld	de,load_base		; where to read the sector data into
+	ld	de,LOAD_BASE		; where to read the sector data into
 	call	sd_cmd17
 	pop	hl			; remove the block number from the stack
 	pop	hl
 
 	call	iputs
-	db	'the block has been read!\r\n\n\0'
+	db	'The block has been read!\r\n\n\0'
 
-	jp	load_base		; Go execute what ever came from the SD card
+	ld	hl,LOAD_BASE		; Dump the block we read from the SD card
+	ld	bc,0x200		; 512 bytes to dump
+	ld	e,1			; and make it all all purdy like
+	call	hexdump
+
+	jp	LOAD_BASE		; Go execute what ever came from the SD card
 
 
 
