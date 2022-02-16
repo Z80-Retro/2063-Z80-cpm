@@ -51,12 +51,12 @@ irq_ctc_3:
 	ld	(uptime),hl
 	ld	a,h
 	or	l
-	jp	nz,irq_ctc_3_lo
+	jp	nz,.irq_ctc_3_lo
 	ld	hl,(uptime+2)
 	inc	hl				; increment the MSW of the uptime counter
 	ld	(uptime+2),hl
 
-irq_ctc_3_lo:
+.irq_ctc_3_lo:
 	pop	hl
 	pop	af
 	ei

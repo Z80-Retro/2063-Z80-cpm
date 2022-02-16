@@ -68,21 +68,21 @@ siob_rx_ready:
 ;##############################################################
 siob_init:
 	ld	c,sio_bc	; port to write into (port B control)
-	jp	sio_init
+	jp	.sio_init
 
 sioa_init:
 	ld	c,sio_ac	; port to write into (port A control)
 
-sio_init:
-	ld	hl,sio_init_wr	; point to init string
-	ld	b,sio_init_len_wr ; number of bytes to send
+.sio_init:
+	ld	hl,.sio_init_wr	; point to init string
+	ld	b,.sio_init_len_wr ; number of bytes to send
 	otir			; write B bytes from (HL) into port in the C reg
 	ret
 
 ;##############################################################
 ; Initialization string for the Z80 SIO
 ;##############################################################
-sio_init_wr:
+.sio_init_wr:
 	db	00011000b	; wr0 = reset everything
 	db	00000100b	; wr0 = select reg 4
 	db	01000100b	; wr4 = /16 N1 (115200 from 1.8432 MHZ clk)
@@ -90,7 +90,7 @@ sio_init_wr:
 	db	11000001b	; wr3 = RX enable, 8 bits/char
 	db	00000101b	; wr0 = select reg 5
 	db	01101000b	; wr5 = DTR=0, TX enable, 8 bits/char
-sio_init_len_wr:   equ $-sio_init_wr
+.sio_init_len_wr:   equ $-.sio_init_wr
 
 
 

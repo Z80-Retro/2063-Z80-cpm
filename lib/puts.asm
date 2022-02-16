@@ -28,7 +28,7 @@
 ;##############################################################
 iputs:
         ex      (sp),hl                 ; hl = @ of string to print
-	call	puts_loop
+	call	.puts_loop
         inc     hl                      ; point past the end of the string
         ex      (sp),hl
         ret
@@ -40,19 +40,19 @@ iputs:
 ;##############################################################
 puts:
 	push	hl
-	call	puts_loop
+	call	.puts_loop
 	pop	hl
 	ret
 
-puts_loop:
+.puts_loop:
         ld      a,(hl)                  ; get the next byte to send
         or      a
-        jr      z,puts_done             ; if A is zero, return
+        jr      z,.puts_done             ; if A is zero, return
         ld      c,a
         call    con_tx_char
         inc     hl                      ; point to next byte to write
-        jp      puts_loop
-puts_done:
+        jp      .puts_loop
+.puts_done:
         ret
 
 ;##############################################################

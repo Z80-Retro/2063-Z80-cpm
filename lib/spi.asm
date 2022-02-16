@@ -63,9 +63,9 @@ spi_write8:
 	;--------- bit 7
 	; special case for the first bit (a already has the gpio_out value)
 	bit	7,c			; check the value of the bit to send
-	jr	z,spi_lo7		; if sending 0, then A is already prepared
+	jr	z,.spi_lo7		; if sending 0, then A is already prepared
 	or	gpio_out_sd_mosi	; else set the bit to send to 1
-spi_lo7:
+.spi_lo7:
 	out	(gpio_out),a		; set data value & CLK falling edge together
 	or	gpio_out_sd_clk		; ready the CLK to send a 1
 	out	(gpio_out),a		; set the CLK's rising edge

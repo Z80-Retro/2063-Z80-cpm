@@ -31,28 +31,28 @@ hexdump:
 	push	de
 	push	hl
 	push	bc
-	jp	hexdump0
+	jp	.hexdump0
 
-hexdump_loop:
+.hexdump_loop:
 	ld	a,e			; fancy format or continuous?
 	or	a
-	jr	z,hd_not8		; not fancy -> hd_not8
+	jr	z,.hd_not8		; not fancy -> hd_not8
 
 	ld	a,l
 	and	0x0f
-	jr	z,hexdump0n
+	jr	z,.hexdump0n
 	cp	0x08			; put an extra space between positiioons 7 and 8
-	jr	nz,hd_not8
+	jr	nz,.hd_not8
 	ld	c,' '
 	call	con_tx_char
-hd_not8:
+.hd_not8:
 	ld	c,' '
 	call	con_tx_char
-	jp	hexdump1
+	jp	.hexdump1
 
-hexdump0n:
+.hexdump0n:
 	call	puts_crlf
-hexdump0:
+.hexdump0:
 	ld	a,h
 	call	hexdump_a
 	ld	a,l
@@ -62,7 +62,7 @@ hexdump0:
 	ld	c,' '
 	call	con_tx_char
 	
-hexdump1:
+.hexdump1:
 	ld	a,(hl)
 	call	hexdump_a
 	inc	hl
@@ -73,7 +73,7 @@ hexdump1:
 
 	ld	a,b
 	or	c
-	jr	nz,hexdump_loop
+	jr	nz,.hexdump_loop
 	call	puts_crlf
 
 	pop	bc
@@ -93,19 +93,19 @@ hexdump_a:
 	srl	a
 	srl	a
 	srl	a
-	call	hexdump_nib
+	call	.hexdump_nib
 	pop	af
 	push	af
 	and	0x0f
-	call	hexdump_nib
+	call	.hexdump_nib
 	pop	af
 	ret
 
-hexdump_nib:
+.hexdump_nib:
 	add	'0'
 	cp	'9'+1
-	jp	m,hexdump_num
+	jp	m,.hexdump_num
 	add	'A'-'9'-1
-hexdump_num:
+.hexdump_num:
 	ld	c,a
 	jp	con_tx_char	   ; tail
