@@ -28,5 +28,4 @@ MEM:    equ 60
 ; This screwy convention is due to the way that that the CP/M origin is defined.
 CPM_BASE:	equ	(MEM-7)*1024
 
-STACK_BASE:	equ	0x0000
 LOAD_BASE:	equ	0xc000		; where the boot loader reads the image from the SD card
