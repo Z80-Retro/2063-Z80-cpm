@@ -236,7 +236,7 @@ endif
 
 if .debug
 	call	iputs
-	db	'The block has been read!\r\n\n\0'
+	db	'The block has been read!\r\n\0'
 
 	ld	hl,LOAD_BASE		; Dump the block we read from the SD card
 	ld	bc,0x200		; 512 bytes to dump
