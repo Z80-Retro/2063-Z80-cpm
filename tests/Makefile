@@ -4,7 +4,7 @@ all: spi_test.bin sd_test.bin
 
 clean:
 	rm -f ldr
-	rm -f *.lst *.bin *.hex
+	rm -f *.lst *.bin *.hex *.sym
 
 DATE := $(shell date --rfc-3339=seconds)
 GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
