@@ -20,22 +20,36 @@
 ;****************************************************************************
 
 include	'io.asm'
+include	'memory.asm'
 
-stacktop:	equ	0
+	org	LOAD_BASE		; the second-stage load address
 
-	org	0xc000		; the second-stage load address
+	ld	sp,LOAD_BASE
 
-	ld	sp,stacktop
+	; XXX Note that the boot loader should have initialized the SIO, CTC etc.
+	; XXX Therefore we can just write to them from here.
 
-	; XXX Note that the boot loader should have initialize the SIO, CTC etc.
-	; XXX therefore we can just write to them from here.
-
-
+	ld	de,0
+.loop:
 	; Display a hello world message.
+	inc	de
+	ld	a,d
+	call	hexdump_a
+	ld	a,e
+	call	hexdump_a
 	call	iputs
-	db	"\r\n\n"
-	db	"Hello from the SD card!!!\r\n"
+	db	": Hello from the SD card!!!\r\n"
 	db	0			; DON'T FORGET the null terminator!
+
+
+	; waste some time
+	ld	hl,0
+.dly:
+	dec	hl
+	ld	a,h
+	or	l
+	jp	z,.loop			; if done, go back & print again
+	jp	.dly
 
 	; Spin loop here because there is nothing else to do
 halt_loop:
