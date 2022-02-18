@@ -85,7 +85,7 @@ include	'memory.asm'
 	db	'\0'
 
 ;##############################################################################
-; Load 16K from the first blocks of partition 1 on the SD card into
+; Load 16K from the first blocks of partition 0 on the SD card into
 ; memory starting at 'LOAD_BASE' and jump to it.
 ; If reading the SD card should fail then this function will return.
 ;
@@ -94,7 +94,7 @@ include	'memory.asm'
 ;##############################################################################
 .boot_sd:
 	call	iputs
-	db	'\r\nBooting SD card partition 1\r\n\n\0'
+	db	'\r\nBooting SD card partition 0\r\n\n\0'
 
 	call	sd_boot		; transmit 74+ CLKs
 
@@ -250,7 +250,7 @@ endif
 	ld	ix,LOAD_BASE+0x01BE+0x08
 
 	call	iputs
-	db	'\nPartition 1 starting block number: \0'
+	db	'\nPartition 0 starting block number: \0'
 	ld	a,(ix+3)
 	call	hexdump_a
 	ld	a,(ix+2)
@@ -262,7 +262,7 @@ endif
 	call	puts_crlf
 
 	call	iputs
-	db	'Partition 1 number of blocks:      \0'
+	db	'Partition 0 number of blocks:      \0'
 	ld	a,(ix+7)
 	call	hexdump_a
 	ld	a,(ix+6)
