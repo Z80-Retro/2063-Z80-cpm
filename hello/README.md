@@ -2,7 +2,7 @@
 
 On a PI-hosted dev system:
 
-Use this to save this program into partition 0:
+Use this to save this program into partition 1:
 
     sudo dd if=hello.bin of=/dev/sda1 bs=512
 
