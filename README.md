@@ -7,6 +7,7 @@ An SD card boot-loader and CP/M 2.2 BIOS for [Z80 Retro!](https://github.com/joh
 * [Wikipedia SPI article](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface)
 * [Wikipedia MBR article](https://en.wikipedia.org/wiki/Master_boot_record)
 * [Wikipedia SD card article](https://en.wikipedia.org/wiki/SD_card)
+* [How I set up my RaspberryPI](https://github.com/johnwinans/raspberry-pi-install)
 
 Any SDHC card should work for this project.  (According to the spec, and SDXC card should work too.) The SD cards used to test this documentation were purchased from MicroCenter.  The specific cards I have been using are available here:
 
