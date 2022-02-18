@@ -59,6 +59,8 @@
 ;.sd_debug: equ 1
 
 ;############################################################################
+; NOTE: Response message formats in SPI mode are different than in SD mode.
+;
 ; Read bytes until we find one with MSB = 0 or bail out retrying.
 ; Return last read byte in A (and a copy also in E)
 ; Calls spi_read8 (see for clobbers)
@@ -77,6 +79,8 @@
 
 
 ;############################################################################
+; NOTE: Response message formats in SPI mode are different than in SD mode.
+;
 ; Read an R7 message into the 5-byte buffer pointed to by HL.
 ; Clobbers A, B, DE, HL
 ;############################################################################
@@ -98,12 +102,12 @@
 	ret
 
 
-;##############################################################
+;############################################################################
 ; SSEL = HI (deassert)
 ; wait at least 1 msec after power up
 ; send at least 74 (80) SCLK rising edges
 ; Clobbers A, DE, B
-;##############################################################
+;############################################################################
 sd_boot:
 	ld	b,10		; 10*8 = 80 bits to read
 .sd_boot1:
@@ -112,7 +116,7 @@ sd_boot:
 	ret
 
 
-;##############################################################
+;############################################################################
 ; Send a command and read an R1 response message.
 ; HL = command buffer address
 ; B = command byte length
@@ -130,7 +134,7 @@ sd_boot:
 ; wait for reply (MSB=0)
 ; read reply
 ; SSEL = HI
-;##############################################################
+;############################################################################
 .sd_cmd_r1:
 	; assert the SSEL line
 	call    spi_ssel_true
@@ -148,14 +152,14 @@ sd_boot:
 	ret
 
 
-;##############################################################
+;############################################################################
 ; Send a command and read an R7 response message.
 ; Note that an R3 response is the same size, so can use the same code.
 ; HL = command buffer address
 ; B = command byte length
 ; DE = 5-byte response buffer address
 ; Clobbers A, BC, DE, HL
-;##############################################################
+;############################################################################
 .sd_cmd_r3:
 .sd_cmd_r7:
 	call    spi_ssel_true
@@ -173,13 +177,17 @@ sd_boot:
 	ret
 
 
-;##############################################################
-; Send a CMD0 message and read an R1 response.
-; CMD0 will establish the card protocol as SPI and enter 
-; the IDLE state.
+;############################################################################
+; Send a CMD0 (GO_IDLE) message and read an R1 response.
+;
+; CMD0 will 
+; 1) Establish the card protocol as SPI (if has just powered up.)
+; 2) Tell the card the voltage at which we are running it.
+; 3) Enter the IDLE state.
+;
 ; Return the response byte in A.
 ; Clobbers A, BC, DE, HL
-;##############################################################
+;############################################################################
 sd_cmd0:
 	ld	hl,.sd_cmd0_buf		; HL = command buffer
 	ld	b,.sd_cmd0_len		; B = command buffer length
@@ -208,22 +216,23 @@ endif
 .sd_cmd0_len:	equ	$-.sd_cmd0_buf
 
 
-;##############################################################
-; Send a CMD8 message and read an R7 response.
-
-; Establish that we are squawking V2.0 of spec & tell the 
-; SD card the operating voltage is 3.3V.  The reply to 
-; CMD8 should be to confirm that 3.3V is OK and must echo
-; the 0xAA back as an extra confirm that the command has been
-; processed properly. (The 0x01 in the byte before the 0xAA
-; is the flag for 3.3V.)
+;############################################################################
+; Send a CMD8 (SEND_IF_COND) message and read an R7 response.
+;
+; Establish that we are squawking V2.0 of spec & tell the SD 
+; card the operating voltage is 3.3V.  The reply to CMD8 should 
+; be to confirm that 3.3V is OK and must echo the 0xAA back as 
+; an extra confirm that the command has been processed properly. 
+; The 0x01 in the byte before the 0xAA in the command buffer 
+; below is the flag for 2.7-3.6V operation.
+;
 ; Establishing V2.0 of the SD spec enables the HCS bit in 
 ; ACMD41 and CCS bit in CMD58.
-
+;
 ; Clobbers A, BC, DE, HL
 ; Return the 5-byte response in the buffer pointed to by DE.
 ; The response should be: 0x01 0x00 0x00 0x01 0xAA.
-;##############################################################
+;############################################################################
 sd_cmd8:
 if .sd_debug
 	push	de			; PUSH response buffer address
@@ -254,13 +263,13 @@ endif
 .sd_cmd8_len:	equ	$-.sd_cmd8_buf
 
 
-;##############################################################
+;############################################################################
 ; Send a CMD58 message and read an R3 response.
-; CMD58 is used to ask the card what viltages it supports and
+; CMD58 is used to ask the card what voltages it supports and
 ; if it is an SDHC/SDXC card or not.
 ; Clobbers A, BC, DE, HL
 ; Return the 5-byte response in the buffer pointed to by DE.
-;##############################################################
+;############################################################################
 sd_cmd58:
 if .sd_debug
 	push	de			; PUSH buffer address
@@ -292,7 +301,7 @@ endif
 
 
 ;############################################################################
-; Send a CMD55 message and read an R1 response.
+; Send a CMD55 (APP_CMD) message and read an R1 response.
 ; CMD55 is used to notify the card that the following message is an ACMD 
 ; (as opposed to a regular CMD.)
 ; Clobbers A, BC, DE, HL
@@ -327,9 +336,12 @@ endif
 
 
 ;############################################################################
-; Send a ACMD41 message and return an R1 response byte in A.
-; The main purpose of ACMD41 to to set the SD card state to READY so
-; that data blocks may be read and written.
+; Send a ACMD41 (SD_SEND_OP_COND) message and return an R1 response byte in A.
+;
+; The main purpose of ACMD41 to set the SD card state to READY so
+; that data blocks may be read and written.  It can fail if the card
+; is not happy with the operating voltage.
+;
 ; Clobbers A, BC, DE, HL
 ; Note that A-commands are prefixed with a CMD55.
 ;############################################################################
@@ -339,6 +351,9 @@ sd_acmd41:
 	ld	hl,.sd_acmd41_buf	; HL = command buffer
 	ld	b,.sd_acmd41_len	; B = buffer byte count
 	call	.sd_cmd_r1
+
+XXX is this an R3 command???
+
 
 if .sd_debug
 	push	af
@@ -362,6 +377,7 @@ endif
 
 ; SD spec p263 Fig 7.1 footnote 1 says we want to set the HCS bit here for HC/XC cards.
 ; Notes on Internet about setting the supply voltage in ACMD41. But not in SPI mode?
+; The folowing works on my MicroCenter SDHC cards:
 
 .sd_acmd41_buf:	db	41|0x40,0x40,0,0,0,0x00|0x01	; Note the HCS flag is set here
 .sd_acmd41_len:	equ	$-.sd_acmd41_buf
@@ -426,6 +442,8 @@ sd_reset:
 	
 
 ;############################################################################
+; CMD17 (READ_SINGLE_BLOCK)
+;
 ; Read one block given by the 32-bit (little endian) number at 
 ; the top of the stack into the buffer given by address in DE.
 ;
@@ -612,11 +630,9 @@ endif
 	jr	.sd_cmd17_done
 
 
-
-
-
-
-;##############################################################
+;############################################################################
+; CMD24 (WRITE_BLOCK)
+;
 ; Write one block given by the 32-bit (little endian) number at 
 ; the top of the stack from the buffer given by address in DE.
 ;
@@ -639,7 +655,7 @@ endif
 ;
 ; A = 0 if the write operation was successful. Else A = 1.
 ; Clobbers A
-;##############################################################
+;############################################################################
 .sd_debug_cmd24: equ	.sd_debug
 
 sd_cmd24:
@@ -816,8 +832,8 @@ endif
 
 
 
-;##############################################################
+;############################################################################
 ; A buffer for exchanging messages with the SD card.
-;##############################################################
+;############################################################################
 .sd_scratch:
 	ds	6
