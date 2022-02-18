@@ -352,9 +352,6 @@ sd_acmd41:
 	ld	b,.sd_acmd41_len	; B = buffer byte count
 	call	.sd_cmd_r1
 
-XXX is this an R3 command???
-
-
 if .sd_debug
 	push	af
 	call	iputs
