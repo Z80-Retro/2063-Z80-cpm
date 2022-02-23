@@ -64,12 +64,13 @@ include	'memory.asm'
 
 	ld	sp,.stacktop
 
-	; Initialize the CTC so that the SIO will have a baud clock if J11-A is set to the CTC!
+	; Initialize the CTC so that the SIO will have a custom baud clock if J11-A is set to the CTC!
 	;ld	c,1			; 115200 bps
-	ld	c,6			; 19200 bps
+	;ld	c,6			; 19200 bps
+	ld	c,12			; 9600 bps
 	call	init_ctc_1
 
-	; Init the SIO to run at 115200 or 19200 depending on J11-A
+	; Init the SIO to run at 115200 or at the CTC rate depending on J11-A
 	call	sioa_init
 
 	; Display a hello world message.
@@ -205,7 +206,7 @@ endif
 
 	; Check that CCS=1 here to indicate that we have an HC/XC card
 	ld	a,(LOAD_BASE+1)
-	and	0x40			; CCS bit is here (See spec p275)
+	and	0x40			; CCS bit is here (See SD spec p275)
 	jr	nz,.boot_hcxc_ok
 
 	call	iputs

@@ -55,10 +55,11 @@ include	'memory.asm'
 
 	; Initialize the CTC so that the SIO will have a baud clock if J11-A is set to the CTC!
 	;ld	c,1			; 115200 bps
-	ld	c,6			; 19200 bps
+	;ld	c,6			; 19200 bps
+	ld	c,12			; 9600 bps
 	call	init_ctc_1
 
-	; Init the SIO to run at 115200 or 19200 depending on J11-A
+	; Init the SIO to run at 115200 or at the CTC rate depending on J11-A
 	call	sioa_init
 
 	; Display a hello world message.
