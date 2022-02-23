@@ -453,56 +453,55 @@ sd_reset:
 ; - set SSEL = false
 ;
 ; A = 0 if the read operation was successful. Else A=1
-; Clobbers A
+; Clobbers A, IX
 ;############################################################################
 .sd_debug_cmd17: equ	.sd_debug
 
 sd_cmd17:
-	; iy is the frame pointer 
-					; +16 = &block_number
-					; +14 = return @
-	push	bc			; +12
-	push	de			; +10 target buffer address
-	push	hl			; +8
-	push	iy			; +6
+					; +10 = &block_number
+					; +8 = return @
+	push	bc			; +6
+	push	hl			; +4
+	push	iy			; +2
+	push	de			; +0 target buffer address
 
-	; make room for the command buffer
-.sd_cmd17_len:	equ	6
-	ld	iy,-.sd_cmd17_len
-	add	iy,sp			; iy = &cmd_buffer
-	ld	sp,iy
+	ld	iy,.sd_scratch		; iy = buffer to format command
+	ld	ix,10			; 10 is the offset from sp to the location of the block number
+	add	ix,sp			; ix = address of uint32_t sd_lba_block number
 
 	ld	(iy+0),17|0x40		; the command byte
-	ld	a,(iy+19)		; stack = little endian
+	ld	a,(ix+3)		; stack = little endian
 	ld	(iy+1),a		; cmd_buffer = big endian
-	ld	a,(iy+18)
+	ld	a,(ix+2)
 	ld	(iy+2),a
-	ld	a,(iy+17)
+	ld	a,(ix+1)
 	ld	(iy+3),a
-	ld	a,(iy+16)
+	ld	a,(ix+0)
 	ld	(iy+4),a
 	ld	(iy+5),0x00|0x01	; the CRC byte
 
 if .sd_debug_cmd17
 	; print the comand buffer
-	push	de
 	call	iputs
 	db	'CMD17: \0'
 	push	iy
-	pop	hl			; hl = &cmd_buffer
-	ld	bc,.sd_cmd17_len
+	pop	hl			; HL = IY = cmd_buffer address
+	ld	bc,6			; B = command buffer length
 	ld	e,0
 	call	hexdump
 
 	; print the target address
 	call	iputs
 	db	'  Target: \0'
-	ld	a,(iy+11)
+
+	pop	de			; restore DE = target buffer address
+	push	de			; and keep it on the stack too
+
+	ld	a,d
 	call	hexdump_a
-	ld	a,(iy+10)
+	ld	a,e
 	call	hexdump_a
 	call	puts_crlf
-	pop	de
 endif
 
 	; assert the SSEL line
@@ -510,15 +509,14 @@ endif
 
 	; send the command 
 	push	iy
-	pop	hl			; hl = iy = &cmd_buffer
-	ld	b,.sd_cmd17_len
+	pop	hl			; HL = IY = cmd_buffer address
+	ld	b,6			; B = command buffer length
 	call    spi_write_str		; clobbers A, BC, D, HL
 
 	; read the R1 response message
 	call    .sd_read_r1		; clobbers A, B, DE
 
 if .sd_debug_cmd17
-	push	de
 	push	af
 	call	iputs
 	db	'  R1: \0'
@@ -527,7 +525,6 @@ if .sd_debug_cmd17
 	call	hexdump_a
 	call	puts_crlf
 	pop	af
-	pop	de
 endif
 
 	; If R1 status != SD_READY (0x00) then error (SD spec p265, Section 7.2.3)
@@ -563,9 +560,6 @@ endif
 	jp	.sd_cmd17_err		; no flag ever arrived
 
 .sd_cmd17_token:
-	ld	l,(iy+10)		; hl = target buffer address
-	ld	h,(iy+11)
-
 	cp	0xfe			; A = data block token? (else is junk from the SD)
 	jr	z,.sd_cmd17_tokok
 
@@ -574,12 +568,14 @@ endif
 	jp	.sd_cmd17_err
 
 .sd_cmd17_tokok:
+	pop	hl			; HL = target buffer address
+	push	hl			; and keep the stack level the same
 	ld	bc,0x200		; 512 bytes to read
 .sd_cmd17_blk:
 	call	spi_read8		; Clobbers A, DE
 	ld	(hl),a
-	inc	hl
-	dec	bc
+	inc	hl			; increment the buffer pointer
+	dec	bc			; decrement the byte counter
 
 if .sd_debug_cmd17
 	; A VERY verbose dump of every byte as they are read in from the card
@@ -600,9 +596,9 @@ if .sd_debug_cmd17
 	pop	bc
 endif
 
-	ld	a,b
+	ld	a,b			; did BC reach zero?
 	or	c
-	jr	nz,.sd_cmd17_blk
+	jr	nz,.sd_cmd17_blk	; if not, go back & read another byte
 
 	call	spi_read8		; read the CRC value (XXX should check this)
 	call	spi_read8		; read the CRC value (XXX should check this)
@@ -611,12 +607,9 @@ endif
 	xor	a			; A = 0 = success!
 
 .sd_cmd17_done:
-	ld	iy,.sd_cmd17_len
-	add	iy,sp
-	ld	sp,iy
+	pop	de
 	pop	iy
 	pop	hl
-	pop	de
 	pop	bc
 	ret
 
@@ -651,12 +644,11 @@ endif
 ; after the long busy wait has completed.
 ;
 ; A = 0 if the write operation was successful. Else A = 1.
-; Clobbers A
+; Clobbers A, IX
 ;############################################################################
 .sd_debug_cmd24: equ	.sd_debug
 
 sd_cmd24:
-	; ix is a quasi-frame pointer 
 					; +10 = &block_number
 					; +8 = return @
 	push	bc			; +6
@@ -665,8 +657,8 @@ sd_cmd24:
 	push	iy			; +0
 
 	ld	iy,.sd_scratch		; iy = buffer to format command
-	ld	ix,10
-	add	ix,sp			; ix = uint32_t sd_lba_block
+	ld	ix,10			; 10 is the offset from sp to the location of the block number
+	add	ix,sp			; ix = address of uint32_t sd_lba_block number
 
 .sd_cmd24_len: equ	6
 
