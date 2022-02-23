@@ -41,7 +41,6 @@ include	'memory.asm'
 	db	": Hello from the SD card!!!\r\n"
 	db	0			; DON'T FORGET the null terminator!
 
-
 	; waste some time
 	ld	hl,0
 .dly:
@@ -51,10 +50,7 @@ include	'memory.asm'
 	jp	z,.loop			; if done, go back & print again
 	jp	.dly
 
-	; Spin loop here because there is nothing else to do
-halt_loop:
-	halt
-	jp	halt_loop
+	; ...we never get here
 
 
 include	'hexdump.asm'
