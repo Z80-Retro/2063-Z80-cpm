@@ -34,7 +34,6 @@ See [./retro](./retro) for details on assembling and installing CP/M onto an SD 
 - [The Unofficial CP/M Web site](http://www.cpm.z80.de/index.html)
 - Genuine Internet hearsay evidence that *suggests* that CP/M can be used in for personal use! 
   - http://www.gaby.de/faq.htm#5
-  - http://www.cpm.z80.de/tim.htm
 - The PC parallel printer interface port pinout and signal meanings
   - https://bixolonusa.com/wp-content/uploads/2016/06/parallel.pdf
 - THe Humongous CP/M Software Archives
