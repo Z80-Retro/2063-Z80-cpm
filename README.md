@@ -5,7 +5,7 @@ A BIOS and build scripts for installing CP/M 2.2 on an SD card for the [Z80 Retr
 
 ## SD Card Preparation
 
-A discussion of how to partition an SD card for the Retro! board can be found here: (./README-SD.md)
+A discussion of how to partition an SD card for the Retro! board can be found in [./README-SD.md](./README-SD.md)
 
 ## Boot a Hello World! app from the SD card
 
