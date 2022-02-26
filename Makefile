@@ -1,7 +1,8 @@
 SUBDIRS=\
 	boot \
 	tests \
-	hello
+	hello \
+	cpm22
 
 
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
