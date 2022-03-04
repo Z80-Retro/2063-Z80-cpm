@@ -27,9 +27,17 @@ See [./retro](./retro) for details on assembling and installing CP/M onto an SD 
 
 ## Resource Links
 
-- Manuals
-  - [CP/M 2.2 Alteration Guide](http://bitsavers.trailing-edge.com/pdf/digitalResearch/cpm/2.2/CPM_2.2_Alteration_Guide_1979.pdf)
-  - A book of the CP/M 2 manuals http://bitsavers.trailing-edge.com/pdf/digitalResearch/cpm/CPM_Operating_System_Manual_Jul82.pdf
+- Individual manual booklets (for the purists):
+  - [Introduction to CPM Features and Facilities](http://www.cpm.z80.de/randyfiles/DRI/Intro_to_CPM_Feat_and_Facilities.pdf)
+  - [CP/M 2.0 Guide for CP/M 1.4 Users](http://www.cpm.z80.de/randyfiles/DRI/CPM_2_0_UG_for_CPM_1_4_Users.pdf)
+  - [ED (A Text Editor)](http://www.cpm.z80.de/randyfiles/DRI/ED.pdf)
+  - [DDT (Dynamic Debugging Tool)](http://www.cpm.z80.de/randyfiles/DRI/DDT.pdf)
+  - [ASM (An 8080 Assembler)](http://www.cpm.z80.de/randyfiles/DRI/ASM.pdf)
+  - [CP/M 2.0 Interface Guide](http://www.cpm.z80.de/randyfiles/DRI/CPM_2_0_Interface_Guide.pdf)
+  - [CP/M 2.0 System Alteration Guide](http://www.cpm.z80.de/randyfiles/DRI/CPM_2_0_System_Alteration_Guide.pdf)
+  - [CP/M 2.2 System Alteration Guide](http://bitsavers.trailing-edge.com/pdf/digitalResearch/cpm/2.2/CPM_2.2_Alteration_Guide_1979.pdf)
+- One big book of all the above manuals
+  - [CP/M 2.x Operating System Manual](http://bitsavers.trailing-edge.com/pdf/digitalResearch/cpm/CPM_Operating_System_Manual_Jul82.pdf)
 
 - [The Unofficial CP/M Web site](http://www.cpm.z80.de/index.html)
 - Genuine Internet hearsay evidence that *suggests* that CP/M can be used in for personal use! 
