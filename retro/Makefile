@@ -11,7 +11,7 @@ GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
 	cat $< | sed -e "s/@@DATE@@/$(DATE)/g" -e "s/@@GIT_VERSION@@/$(GIT_VERSION)/g" | z80asm - -o $@ --list=$(basename $@).lst --label=$(basename $@).sym $(ASM_FLAGS)
 
 
-# It would be nice if all the labels in COM22.Z80 could be made file-local
+# It would be nice if all the labels in CPM22.Z80 could be made file-local
 # as well (be prefixing them with a dot.  But it is not obvious how to do that
 # with a simple sed-script.
 
