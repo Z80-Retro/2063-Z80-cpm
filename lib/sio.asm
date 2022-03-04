@@ -25,7 +25,7 @@
 
 
 ;##############################################################
-; Return NZ if sio A rx is ready
+; Return NZ if sio A tx is ready
 ; Clobbers: AF
 ;##############################################################
 sioa_tx_ready:
@@ -34,7 +34,7 @@ sioa_tx_ready:
 	ret			; a = 0 = not ready
 
 ;##############################################################
-; Return NZ if sio B rx is ready
+; Return NZ if sio B tx is ready
 ; Clobbers: AF
 ;##############################################################
 siob_tx_ready:
@@ -53,7 +53,7 @@ sioa_rx_ready:
 	ret			; 0 = not ready
 
 ;##############################################################
-; Return NZ (with A=1) if sio B tx is ready and Z (with A=0) if not ready. 
+; Return NZ (with A=1) if sio B rx is ready and Z (with A=0) if not ready. 
 ; Clobbers: AF
 ;##############################################################
 siob_rx_ready:
