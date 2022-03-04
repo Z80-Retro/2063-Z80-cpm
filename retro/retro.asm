@@ -118,7 +118,7 @@ SECTRN: JP      .bios_sectrn
 	ld	hl,.boot_msg
 	call	puts
 
-	jp	.halt_loop
+	jp	.go_cpm
 
 
 .boot_msg:
@@ -131,30 +131,105 @@ SECTRN: JP      .bios_sectrn
 	defb	'\0'
 
 
-
-
-
 .bios_wboot:
+	call	iputs
+	db	".bios_wboot entered\r\n\0"
+	; XXX finish me
+
+
+.go_cpm:
+	ld	a,0xc3		; opcode for JP
+	ld	(0),a
+	ld	hl,WBOOT
+	ld	(1),hl		; address 0 now = JP WBOOT
+
+	ld	(5),a		; opcode for JP
+	ld	hl,FBASE
+	ld	(6),hl		; address 6 now = JP FBASE
+	
+	ld	c,0
+	jp	CPM_BASE	; start the CCP
+	
+
+
 .bios_const:
+	; A = 0xff if ready
+	call	con_rx_ready
+	ret	z		; a = 0 = not ready
+	ld	a,0xff
+	ret			; a = 0xff = ready
+
 .bios_conin:
+	; return char in A
+	jp	con_rx_char
+
 .bios_conout:
+	; print char in C
+	jp	con_tx_char
+
 .bios_list:
+	ret
+
 .bios_punch:
+	ret
+
 .bios_reader:
+	ld	a,0x1a
+	ret
+
 .bios_home:
-.bios_seldsk:
+	call	iputs
+	db	".bios_home entered\r\n\0"
+	ld	bc,0
+	; fall into .bios_settrk
+
 .bios_settrk:
+	call	iputs
+	db	".bios_settrk entered\r\n\0"
+	ld	(.disk_track),bc
+	ret
+
+.bios_seldsk:
+	call	iputs
+	db	".bios_seldsk entered\r\n\0"
+	ld	a,c
+	ld	(.disk_disk),a
+	ld	hl,0			; XXX finish this!
+	ret
+
 .bios_setsec:
+	call	iputs
+	db	".bios_setsec entered\r\n\0"
+	ld	(.disk_sector),bc
+	ret
+
 .bios_setdma:
+	call	iputs
+	db	".bios_setdma entered\r\n\0"
+	ld	(.disk_dma),bc
+	ret
+
 .bios_read:
+	call	iputs
+	db	".bios_read entered\r\n\0"
+	ld	a,1	; XXX 
+	ret
+
 .bios_write:
+	call	iputs
+	db	".bios_write entered\r\n\0"
+	ld	a,1	; XXX 
+	ret
+
 .bios_prstat:
+	ld	a,0		; printer is never ready
+	ret
+
 .bios_sectrn:
-
-
-.halt_loop:
-	halt
-	jp	.halt_loop
+	; 1:1 translation  (no skew factor)
+	ld	h,b
+	ld	l,c
+	ret
 
 
 ;##########################################################################
@@ -166,6 +241,22 @@ SECTRN: JP      .bios_sectrn
 	call	init_ctc_1		; start CTC1 in case J11-A selects it!
 	call	sioa_init		; 115200 or 19200/9600 depending on J11-A
 	ret
+
+
+
+;##########################################################################
+.disk_dma:
+	dw	0x80			; default DMA address = 0x80
+
+.disk_track:
+	dw	0x0
+
+.disk_disk:
+	db	0x0
+
+.disk_sector:
+	dw	0x0
+
 
 
 ;##########################################################################
