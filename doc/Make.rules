@@ -1,0 +1,80 @@
+all::
+
+CC=gcc
+CCC=g++
+CXX=$(CCC)
+LATEX=latex
+DVIPS=dvips
+
+TEX_CLEANFILES = *.aux *.log *.dvi *.toc *.lof *.bbl *.blg *.ind *.ilg *.idx *.out
+DEFAULTPATH=`kpsewhich -show-path=.tex`
+TEXPATH=$(DEFAULTPATH)
+
+GITHUB_ROOT=https://github.com/johnwinans/2063-Z80-cpm
+GIT_DESCRIPTION=$(shell git show -s --format='%ci'; git describe --dirty )
+PROJECT_ROOT=$(shell cd ../../; pwd)
+#LATEXFLAGS="\newcommand\GitFileName{"`pwd | sed -e "s/_/\\\\\\\\_/g" -e 's|${HOME}/|\\\textasciitilde/|'`/$<"}\newcommand\GitDescription{"`git show -s --format='%ci'; git describe --dirty;`"}\input{$<}"
+#LATEXFLAGS="\newcommand\GitFileName{"`pwd | sed -e "s/_/\\\\\\\\_/g" -e 's|$(PROJECT_ROOT)/|\\\textasciitilde/|'`/$<"}\newcommand\GitDescription{"`git show -s --format='%ci'; git describe --dirty;`"}\input{$<}"
+LATEXFLAGS="\newcommand\GitFileName{"`pwd | sed -e "s/_/\\\\\\\\_/g" -e 's|$(PROJECT_ROOT)/|\\\textasciitilde/|'`/$<"}\newcommand\GitDescription{"$(GIT_DESCRIPTION) -- $(GITHUB_ROOT)"}\input{$<}"
+
+
+
+
+BIBTEX=
+# BIBTEX="bibtex \${<:.tex=}"
+
+.SUFFIXES : .tex .pdf .fig .eps
+
+#CFLAGS+=-ansi -pedantic
+CFLAGS+=-Wall -Werror
+CFLAGS+=-Wextra
+
+CXXFLAGS+=-ansi -pedantic
+CXXFLAGS+=-Wall -Werror
+CXXFLAGS+=-Wextra
+
+.tex.pdf:
+	( TEXINPUTS=$(TEXPATH); export TEXINPUTS; pdflatex $(LATEXFLAGS) $<; $(BIBTEX) pdflatex $(LATEXFLAGS) $<; pdflatex $(LATEXFLAGS) $<; )
+
+.fig.eps:
+	fig2dev -L eps $< > $@
+
+.fig.pdf:
+	fig2dev -L pdftex $< > $@
+
+texclean::
+	rm -f ${TEX_CLEANFILES}
+
+
+.PHONY : clean
+.PHONY : world
+.PHONY : all
+.PHONY : doc
+
+# Generate some virtual targets a recursive make across subdirectories
+# add a prefix to each directory name to make unique versions for all, clean,...
+CLEAN_DIRS=$(SUBDIRS:%=clean-%)
+ALL_DIRS=$(SUBDIRS:%=all-%)
+DOXY_DIRS=$(SUBDIRS:%=doxy-%)
+.PHONY: $(CLEAN_DIRS) $(ALL_DIRS) $(DOXY_DIRS)
+
+all:: $(ALL_DIRS)
+
+clean:: $(CLEAN_DIRS)
+
+doc:: $(DOXY_DIRS)
+	if [ -f Doxyfile ]; then doxygen Doxyfile; fi
+
+# for each dir, do a make all
+$(ALL_DIRS):
+	$(MAKE) -C $(@:all-%=%) all
+
+# for each dir, do a make clean
+$(CLEAN_DIRS):
+	$(MAKE) -C $(@:clean-%=%) clean
+
+# for each dir, do a make doc
+$(DOXY_DIRS):
+	$(MAKE) -C $(@:doxy-%=%) doc
+
+world:: clean all
