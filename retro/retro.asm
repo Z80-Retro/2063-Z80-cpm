@@ -96,8 +96,8 @@ SECTRN: JP      .bios_sectrn
 ; If the IOBYTE function is implemented, it must be set at this point.
 ;
 ; The various system parameters which are set by the WBOOT entry point
-; must be initialized (see .go_cpm), and control is transferred to the CCP at
-; 3400H+b for further processing.
+; must be initialized (see .go_cpm), and control is transferred to the CCP 
+; at 3400H+b for further processing.
 ;
 ; Note that reg C must be set to zero to select drive A.
 ;
@@ -167,10 +167,9 @@ SECTRN: JP      .bios_sectrn
 	ld	(5),a		; opcode for JP
 	ld	hl,FBASE
 	ld	(6),hl		; address 6 now = JP FBASE
-	
+
 	ld	c,0
 	jp	CPM_BASE	; start the CCP
-	
 
 
 ;##########################################################################
@@ -286,16 +285,19 @@ SECTRN: JP      .bios_sectrn
 ;
 ;##########################################################################
 .bios_settrk:
-	call	iputs
-	db	".bios_settrk entered\r\n\0"
 	ld	(.disk_track),bc
+
+	call	iputs
+	db	".bios_settrk entered: \0"
+	call	.debug_disk
+
 	ret
 
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p18:
 ; Select the disk drive given by register C for further operations, where
-; register C contains 0 for drive A, 1 for drive 8, and so-forth UP to 15
+; register C contains 0 for drive A, 1 for drive B, and so-forth UP to 15
 ; for drive P.
 ;
 ; On each disk select, SELDSK must return in HL the base address of a 
@@ -304,13 +306,19 @@ SECTRN: JP      .bios_sectrn
 ; If there is an attempt to select a non-existent drive, SELDSK returns
 ; HL=0000H as an error indicator.
 ;
+; The Z80 Retro! only has one drive. However, I implemented this to allow
+; more disks to be added without a rewrite.
+;
 ;##########################################################################
 .bios_seldsk:
-	call	iputs
-	db	".bios_seldsk entered\r\n\0"
 	ld	a,c
 	ld	(.disk_disk),a
-	ld	hl,0			; XXX finish this!
+
+	call	iputs
+	db	".bios_seldsk entered: \0"
+	call	.debug_disk
+
+	ld	hl,0			; HL = 0 = invalid disk 
 	ret
 
 ;##########################################################################
@@ -321,9 +329,12 @@ SECTRN: JP      .bios_sectrn
 ;
 ;##########################################################################
 .bios_setsec:
-	call	iputs
-	db	".bios_setsec entered\r\n\0"
 	ld	(.disk_sector),bc
+
+	call	iputs
+	db	".bios_setsec entered: \0"
+	call	.debug_disk
+
 	ret
 
 ;##########################################################################
@@ -337,10 +348,52 @@ SECTRN: JP      .bios_sectrn
 ;
 ;##########################################################################
 .bios_setdma:
-	call	iputs
-	db	".bios_setdma entered\r\n\0"
 	ld	(.disk_dma),bc
+
+	call	iputs
+	db	".bios_setdma entered: \0"
+	call	.debug_disk
+
 	ret
+
+;##########################################################################
+; A debug routing for displaying the settings before a read or write
+; operation.
+;
+; Clobbers AF, C
+;##########################################################################
+.debug_disk:
+	call	iputs
+	db	'disk=0x\0'
+
+	ld	a,(.disk_disk)
+	call	hexdump_a
+
+	call    iputs
+	db	", track=0x\0"
+	ld	a,(.disk_track+1)
+	call	hexdump_a
+	ld	a,(.disk_track)
+	call	hexdump_a
+
+	call	iputs
+	db	", sector=0x\0"
+	ld	a,(.disk_sector+1)
+	call	hexdump_a
+	ld	a,(.disk_sector)
+	call	hexdump_a
+
+	call	iputs
+	db	", dma=0x\0"
+	ld	a,(.disk_dma+1)
+	call	hexdump_a
+	ld	a,(.disk_dma)
+	call	hexdump_a
+	call	puts_crlf
+
+	ret
+
+
 
 ;##########################################################################
 ;
@@ -360,8 +413,11 @@ SECTRN: JP      .bios_sectrn
 ;##########################################################################
 .bios_read:
 	call	iputs
-	db	".bios_read entered\r\n\0"
 
+	db	".bios_read entered: \0"
+	call	.debug_disk
+
+	; tell CP/M that we can not read the requested sector
 	ld	a,1	; XXX  <--------- stub in an error for every read
 
 	ret
@@ -391,7 +447,8 @@ SECTRN: JP      .bios_sectrn
 ;##########################################################################
 .bios_write:
 	call	iputs
-	db	".bios_write entered\r\n\0"
+	db	".bios_write entered: \0"
+	call	.debug_disk
 
 	ld	a,1	; XXX  <--------- stub in an error for every write
 
@@ -466,6 +523,7 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 
 .disk_sector:				; last set value of of the disk sector
 	dw	0x0
+
 
 
 	end
