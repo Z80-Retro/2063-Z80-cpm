@@ -12,7 +12,7 @@ GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
 
 
 # It would be nice if all the labels in CPM22.Z80 could be made file-local
-# as well (be prefixing them with a dot.  But it is not obvious how to do that
+# as well (by prefixing them with a dot.)  But it is not obvious how to do that
 # with a simple sed-script.
 
 cpm22.asm: ../cpm22/CPM22.Z80
