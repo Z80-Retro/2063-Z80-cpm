@@ -118,6 +118,14 @@ SECTRN: JP      .bios_sectrn
 	ld	hl,.boot_msg
 	call	puts
 
+	; For sanity sake, wipe the zero-page so we aren't confused by 
+	; whatever random noise the flash boot-loader has left there.
+	ld	hl,0
+	ld	de,1
+	ld	bc,0xff
+	ld	(hl),0
+	ldir
+
 	jp	.go_cpm
 
 
@@ -135,8 +143,7 @@ SECTRN: JP      .bios_sectrn
 ;
 ; CP/M 2.2 Alteration Guide p17:
 ; The WBOOT entry point gets control when a warm start occurs.  A warm
-; start is performed whenever a user program branches to location 00008,
-; or when the CPU is reset from the front panel.
+; start is performed whenever a user program branches to location 0x0000.
 ;
 ; The CP/M CCP and BDOS must be re-loaded from the first two tracks of 
 ; drive A up to, but not including, the BIOS.
@@ -152,7 +159,7 @@ SECTRN: JP      .bios_sectrn
 ;##########################################################################
 .bios_wboot:
 	call	iputs
-	db	".bios_wboot entered\r\n\0"
+	db	"\r\n.bios_wboot entered\r\n\0"
 
 	; XXX reload the CCP and BDOS here
 
@@ -168,14 +175,26 @@ SECTRN: JP      .bios_sectrn
 	ld	hl,FBASE
 	ld	(6),hl		; address 6 now = JP FBASE
 
-	ld	c,0
+	ld	bc,0x80		; this is here because it is in the example CBIOS (AG p.52)
+	call	.bios_setdma
+
+if 1
+	; dump the zero-page for reference
+	ld	hl,0		; start address
+	ld	bc,0x100	; number of bytes
+	ld	e,1		; fancy format
+	call	hexdump
+endif
+
+	ld	a,(4)		; load the current disk # from page-zero into a/c
+	ld	c,a
 	jp	CPM_BASE	; start the CCP
 
 
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p17:
-; If the console device is ready then return 0FFH in register A.
+; If the console device is ready for reading then return 0FFH in register A.
 ; Else return 00H in register A.
 ;
 ;##########################################################################
@@ -262,10 +281,10 @@ SECTRN: JP      .bios_sectrn
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p18:
-; Return the disk head of the currently selected disk (initially disk A)
-; to the track 00 position.
+; Return the disk head of the currently selected disk to the track 
+; 00 position.
 ;
-; The Z80 Retro! does not have a mechanical disk driver. So just treat
+; The Z80 Retro! does not have a mechanical disk drive. So just treat
 ; this like a SETTRK 0.
 ;
 ;##########################################################################
@@ -413,7 +432,6 @@ SECTRN: JP      .bios_sectrn
 ;##########################################################################
 .bios_read:
 	call	iputs
-
 	db	".bios_read entered: \0"
 	call	.debug_disk
 
@@ -508,21 +526,21 @@ include 'hexdump.asm'
 gpio_out_cache: ds  1			; GPIO output latch cache
 
 ;##########################################################################
-; The .disk_xxx values are used to retain the most recent values that
+; The .disk_XXX values are used to retain the most recent values that
 ; have been set by the .bios_setXXX routines.
 ; These are used by the .bios_read and .bios_write routines.
 ;##########################################################################
 .disk_dma:				; last set value of the DMA buffer address
-	dw	0x80			; default DMA address = 0x80
+	dw	0xa5a5
 
 .disk_track:				; last set value of the disk track
-	dw	0x0
+	dw	0xa5a5
 
 .disk_disk:				; last set value of the selected disk
-	db	0x0
+	db	0xa5
 
 .disk_sector:				; last set value of of the disk sector
-	dw	0x0
+	dw	0xa5a5
 
 
 
