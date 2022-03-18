@@ -123,11 +123,11 @@ SECTRN: JP      .bios_sectrn
 
 	call	.init_console		; Note: console should still be initialized from the boot loader
 
-if .debug >= 1
+if .debug > 0
 	call	iputs
-	db	".bios_boot entered\r\n\0"
+	db	"\r\n.bios_boot entered\r\n\0"
 	call	iputs
-	db	"\r\nNOTICE: Debug level is set to: 0x\0"
+	db	"NOTICE: Debug level is set to: 0x\0"
 	ld	a,.debug		; A = the current debug level
 	call	hexdump_a		; print the current level number
 	call	puts_crlf		; and a newline
