@@ -22,7 +22,16 @@
 ;
 ;****************************************************************************
 
-.debug:		equ	0		; set to 1 for debug printing, 0 for not
+
+;##########################################################################
+; set .debug to:
+;    0 = no debug output
+;    1 = print messages from new code under development
+;    2 = print all the above plus the primairy 'normal' debug messages
+;    3 = print all the above plus verbose 'noisy' debug messages
+;##########################################################################
+.debug:		equ	3
+
 
 include	'io.asm'
 include	'memory.asm'
@@ -114,6 +123,16 @@ SECTRN: JP      .bios_sectrn
 
 	call	.init_console		; Note: console should still be initialized from the boot loader
 
+if .debug >= 1
+	call	iputs
+	db	".bios_boot entered\r\n\0"
+	call	iputs
+	db	"\r\nNOTICE: Debug level is set to: 0x\0"
+	ld	a,.debug		; A = the current debug level
+	call	hexdump_a		; print the current level number
+	call	puts_crlf		; and a newline
+endif
+
 	; Display a hello world message.
 	ld	hl,.boot_msg
 	call	puts
@@ -158,8 +177,10 @@ SECTRN: JP      .bios_sectrn
 ;
 ;##########################################################################
 .bios_wboot:
+if .debug >= 2
 	call	iputs
 	db	"\r\n.bios_wboot entered\r\n\0"
+endif
 
 	; XXX reload the CCP and BDOS here
 
@@ -178,7 +199,7 @@ SECTRN: JP      .bios_sectrn
 	ld	bc,0x80		; this is here because it is in the example CBIOS (AG p.52)
 	call	.bios_setdma
 
-if 1
+if .debug >= 3
 	; dump the zero-page for reference
 	ld	hl,0		; start address
 	ld	bc,0x100	; number of bytes
@@ -289,9 +310,12 @@ endif
 ;
 ;##########################################################################
 .bios_home:
+if .debug >= 2
 	call	iputs
 	db	".bios_home entered\r\n\0"
-	ld	bc,0
+endif
+
+	ld	bc,0		; BC = 0 = track number passed into .bios_settrk
 
 	; Fall into .bios_settrk <--------------- NOTICE!!
 
@@ -306,10 +330,11 @@ endif
 .bios_settrk:
 	ld	(.disk_track),bc
 
+if .debug >= 2
 	call	iputs
 	db	".bios_settrk entered: \0"
 	call	.debug_disk
-
+endif
 	ret
 
 ;##########################################################################
@@ -333,9 +358,11 @@ endif
 	ld	a,c
 	ld	(.disk_disk),a
 
+if .debug >= 2
 	call	iputs
 	db	".bios_seldsk entered: \0"
 	call	.debug_disk
+endif
 
 	ld	hl,0			; HL = 0 = invalid disk 
 	ret
@@ -350,9 +377,11 @@ endif
 .bios_setsec:
 	ld	(.disk_sector),bc
 
+if .debug >= 2
 	call	iputs
 	db	".bios_setsec entered: \0"
 	call	.debug_disk
+endif
 
 	ret
 
@@ -369,9 +398,11 @@ endif
 .bios_setdma:
 	ld	(.disk_dma),bc
 
+if .debug >= 2
 	call	iputs
 	db	".bios_setdma entered: \0"
 	call	.debug_disk
+endif
 
 	ret
 
@@ -381,6 +412,7 @@ endif
 ;
 ; Clobbers AF, C
 ;##########################################################################
+if .debug >= 1
 .debug_disk:
 	call	iputs
 	db	'disk=0x\0'
@@ -411,7 +443,7 @@ endif
 	call	puts_crlf
 
 	ret
-
+endif
 
 
 ;##########################################################################
@@ -431,9 +463,11 @@ endif
 ;
 ;##########################################################################
 .bios_read:
+if .debug >= 1
 	call	iputs
 	db	".bios_read entered: \0"
 	call	.debug_disk
+endif
 
 	; tell CP/M that we can not read the requested sector
 	ld	a,1	; XXX  <--------- stub in an error for every read
@@ -464,9 +498,11 @@ endif
 ;
 ;##########################################################################
 .bios_write:
+if .debug >= 1
 	call	iputs
 	db	".bios_write entered: \0"
 	call	.debug_disk
+endif
 
 	ld	a,1	; XXX  <--------- stub in an error for every write
 
