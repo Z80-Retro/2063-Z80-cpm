@@ -56,12 +56,12 @@ See [./retro](./retro) for details on assembling and installing CP/M onto an SD 
   - http://www.gaby.de/faq.htm#5
 - The PC parallel printer interface port pinout and signal meanings
   - https://bixolonusa.com/wp-content/uploads/2016/06/parallel.pdf
-- THe Humongous CP/M Software Archives
+- The Humongous CP/M Software Archives
   - http://cpmarchives.classiccmp.org/
 - Good stuff from someone writing a BIOS for a retro project with a nice story about what can happen if you don't carefully read the Alteration Guide first!
   - http://cpuville.com/Code/CPM-on-a-new-computer.html
 - A discussion of CP/M internal basics
   - https://obsolescence.wixsite.com/obsolescence/cpm-internals
-- A simulator that looks impressive. But complicated:
+- A simulator that looks impressive:
   - https://www.autometer.de/unix4fun/z80pack/#documentation
 
