@@ -350,13 +350,13 @@ endif
 ; If there is an attempt to select a non-existent drive, SELDSK returns
 ; HL=0000H as an error indicator.
 ;
-; The Z80 Retro! only has one drive. However, I implemented this to allow
-; more disks to be added without a rewrite.
+; The Z80 Retro! only has one drive.
 ;
 ;##########################################################################
 .bios_seldsk:
 	ld	a,c
-	ld	(.disk_disk),a
+	ld	(.disk_disk),a		; XXX should we save this now or defer 
+					; till after we validate the value?
 
 if .debug >= 2
 	call	iputs
@@ -365,6 +365,11 @@ if .debug >= 2
 endif
 
 	ld	hl,0			; HL = 0 = invalid disk 
+	ld	a,(.disk_disk)
+	or	a			; did drive A get selected?
+	ret	nz			; no -> error
+
+	ld	hl,.bios_dph		; the DPH for disk A
 	ret
 
 ;##########################################################################
@@ -469,8 +474,19 @@ if .debug >= 1
 	call	.debug_disk
 endif
 
+if 0
 	; tell CP/M that we can not read the requested sector
 	ld	a,1	; XXX  <--------- stub in an error for every read
+else
+	; fake a 'blank'/formatted sector
+	ld	hl,(.disk_dma)		; HL = buffer address
+	ld	de,(.disk_dma)
+	inc	de			; DE = buffer address + 1
+	ld	bc,0x007f		; BC = 127
+	ld	(hl),0xe5
+	ldir				; set 128 bytes from (hl) to 0xe5
+	xor	a			; A = 0 = OK
+endif
 
 	ret
 
@@ -578,6 +594,65 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 .disk_sector:				; last set value of of the disk sector
 	dw	0xa5a5
 
+
+
+;##########################################################################
+; Goal: Define a CP/M-compatible filesystem that can be implemented using
+; an SDHC card.  An SDHC card is comprised of a number of 512-byte blocks.
+;
+; Plan:
+; - Put 4 128-byte CP/M sectors into each 512-byte SDHC block.
+; - Treat each SDHC block as a CP/M track.
+;
+; This filesystem has:
+;  128 bytes/sector (CP/M requirement)
+;  4 sectors/track (Retro BIOS designer's choice)
+;  65536 total sectors (CP/M limit)
+;  65536*128 = 8388608 total bytes (CP/M limit)
+;  65536/4 = 16384 tracks
+;  2048 allocation block size (Retro BIOS designer's choice)
+;  8388608/2048 = 4096 total allocation blocks
+;  4096-32*512/2048 = 4088 allocation blocks not counting reserved tracks
+;  512 directory entries (Retro BIOS designer's choice)
+;  512*32 = 16384 total bytes in the directory
+;  16384/2048 = 8 allocation blocks for the directory
+;
+;  BLS  BSH BLM    ------EXM--------
+;                  DSM<256   DSM>255
+;  1024  3    7       0         x
+;  2048  4   15       1         0  <----------------------
+;  4096  5   31       3         1
+;  8192  6   63       7         3
+; 16384  7  127      15         7
+;
+;##########################################################################
+.bios_dph:
+	dw	0		; XLT sector translation table (no xlation done)
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	.bios_dirbuf	; DIRBUF pointer
+	dw	.bios_dpb_a	; DPB pointer
+	dw	0		; CSV pointer (optional, not implemented)
+	dw	.bios_alv_a	; ALV pointer
+
+.bios_dirbuf:
+	ds	128		; scratch directory buffer
+
+.bios_dpb_a:
+	dw	4		; SPT
+	db	4		; BSH
+	db	15		; BLM
+	db	0		; EXM
+	dw	4087		; DSM (max allocation block number)
+	dw	511		; DRM
+	db	0xff		; AL0
+	db	0x00		; AL1
+	dw	0		; CKS
+	dw	32		; OFF
+
+.bios_alv_a:
+	ds	(4087/8)+1	; scratchpad used by BDOS for disk allocation info
 
 
 	end
