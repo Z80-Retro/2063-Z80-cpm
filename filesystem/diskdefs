@@ -1,0 +1,10 @@
+diskdef z80-retro-2k-8m
+  seclen 128
+  tracks 16384
+  sectrk 4
+  blocksize 2048
+  maxdir 512
+  skew 1
+  boottrk 32
+  os 2.2
+end
