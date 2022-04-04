@@ -30,14 +30,11 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-.debug:		equ	3
+.debug:		equ	0
 
 
 include	'io.asm'
 include	'memory.asm'
-
-.stacktop:	equ	0x0000		; end of RAM
-
 
 	org	LOAD_BASE		; Where the boot loader places this code.
 
@@ -119,7 +116,7 @@ SECTRN: JP      .bios_sectrn
 	out	(gpio_out),a
 
 	; make sure we have a viable stack
-	ld	sp,.stacktop
+	ld	sp,.bios_stack		; use the private BIOS stack to get started
 
 	call	.init_console		; Note: console should still be initialized from the boot loader
 
@@ -182,7 +179,13 @@ if .debug >= 2
 	db	"\r\n.bios_wboot entered\r\n\0"
 endif
 
-	; XXX reload the CCP and BDOS here
+	; XXX we need to reload the CCP and BDOS here
+	call	iputs
+	db	"\r\n\r\nERROR: THE WBOOT FUNCTION IS UNIMPLEMENTED.  HALTING."
+	db	"\r\n\n*** PRESS RESET TO REBOOT ***\r\n"
+	db	0
+	jp	$		; endless spin loop
+
 
 	; fall through into .go_cpm...
 
@@ -475,9 +478,6 @@ if .debug >= 1
 endif
 
 if 0
-	; tell CP/M that we can not read the requested sector
-	ld	a,1	; XXX  <--------- stub in an error for every read
-else
 	; fake a 'blank'/formatted sector
 	ld	hl,(.disk_dma)		; HL = buffer address
 	ld	de,(.disk_dma)
@@ -486,6 +486,71 @@ else
 	ld	(hl),0xe5
 	ldir				; set 128 bytes from (hl) to 0xe5
 	xor	a			; A = 0 = OK
+else
+	; switch to a local stack (we only have a few levels when called from the BDOS!)
+	push	hl			; save HL into the caller's stack
+	ld	hl,0
+	add	hl,sp			; HL = SP
+	ld	sp,.bios_stack		; SP = temporary private BIOS stack area
+	push	hl			; save the old SP value in the BIOS stack
+
+	push	bc			; save the register pairs we wilol otherwise clobber
+	push	de			; this is not critical but may make WBOOT cleaner later
+
+	ld	hl,(.disk_track)	; HL = CP/M track number
+
+	; XXX This is a hack that won't work unless the disk partition < 0x10000
+	; XXX This has the SD card partition offset hardcoded in it!!!
+.sd_partition_base: equ	0x800
+	ld	de,.sd_partition_base	; XXX add the starting partition block number
+	add	hl,de			; HL = SD physical block number
+
+	; push the 32-bit physical SD block number into the stack in little-endian order
+	ld	de,0
+	push	de			; 32-bit SD block number (big end)
+	push	hl			; 32-bit SD block number (little end)
+	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
+	call	sd_cmd17		; read the SD block
+	pop	hl			; clean the SD block number from the stack
+	pop	de
+
+	or	a			; was the SD driver read OK?
+	jr	z,.bios_read_sd_ok
+
+	call	iputs
+	db	"BIOS_READ FAILED!\r\n\0"
+	ld	a,1			; tell CP/M the read failed
+	jp	.bios_read_ret
+
+.bios_read_sd_ok:
+	; calculate the CP/M sector offset address (.disk_sector*128)
+	ld	hl,(.disk_sector)	; must be 0..3
+	add	hl,hl			; HL *= 2
+	add	hl,hl			; HL *= 4
+	add	hl,hl			; HL *= 8
+	add	hl,hl			; HL *= 16
+	add	hl,hl			; HL *= 32
+	add	hl,hl			; HL *= 64
+	add	hl,hl			; HL *= 128
+
+	; calculate the address of the CP/M sector in the .bios_sdbuf
+	ld	bc,.bios_sdbuf
+	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
+
+	; copy the data of interest from the SD block
+	ld	de,(.disk_dma)		; target address
+	ld	bc,0x0080		; number of bytes to copy
+	ldir
+
+	xor	a			; A = 0 = read OK
+
+.bios_read_ret:
+	pop	de			; restore saved regs
+	pop	bc
+
+	pop	hl			; HL = original saved stack pointer
+	ld	sp,hl			; SP = original stack address
+	pop	hl			; restore the original  HL value
 endif
 
 	ret
@@ -567,8 +632,8 @@ include 'sio.asm'
 include 'ctc1.asm'
 include 'puts.asm'
 include 'hexdump.asm'
-;include 'sdcard.asm'
-;include 'spi.asm'
+include 'sdcard.asm'
+include 'spi.asm'
 
 
 ;##########################################################################
@@ -604,26 +669,31 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 ; - Put 4 128-byte CP/M sectors into each 512-byte SDHC block.
 ; - Treat each SDHC block as a CP/M track.
 ;
-; This filesystem has:
+; This CP/M filesystem has:
 ;  128 bytes/sector (CP/M requirement)
 ;  4 sectors/track (Retro BIOS designer's choice)
-;  65536 total sectors (CP/M limit)
-;  65536*128 = 8388608 total bytes (CP/M limit)
+;  65536 total sectors (max CP/M limit)
+;  65536*128 = 8388608 gross bytes (max CP/M limit)
 ;  65536/4 = 16384 tracks
-;  2048 allocation block size (Retro BIOS designer's choice)
-;  8388608/2048 = 4096 total allocation blocks
-;  4096-32*512/2048 = 4088 allocation blocks not counting reserved tracks
+;  2048 allocation block size BLS (Retro BIOS designer's choice)
+;  8388608/2048 = 4096 gross allocation blocks in our filesystem
+;  32 = number of reserved tracks to hold the O/S
+;  32*512 = 16384 total reserved track bytes
+;  floor(4096-16384/2048) = 4088 total allocation blocks, absent the reserved tracks
 ;  512 directory entries (Retro BIOS designer's choice)
 ;  512*32 = 16384 total bytes in the directory
-;  16384/2048 = 8 allocation blocks for the directory
+;  ceiling(16384/2048) = 8 allocation blocks for the directory
 ;
-;  BLS  BSH BLM    ------EXM--------
 ;                  DSM<256   DSM>255
+;  BLS  BSH BLM    ------EXM--------
 ;  1024  3    7       0         x
 ;  2048  4   15       1         0  <----------------------
 ;  4096  5   31       3         1
 ;  8192  6   63       7         3
 ; 16384  7  127      15         7
+;
+; ** NOTE: This filesystem design is inefficient because it is unlikely
+;          that ALL of the allocation blocks will ultimately get used!
 ;
 ;##########################################################################
 .bios_dph:
@@ -652,7 +722,21 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 	dw	32		; OFF
 
 .bios_alv_a:
-	ds	(4087/8)+1	; scratchpad used by BDOS for disk allocation info
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+.bios_alv_a_end:
+
+.bios_sdbuf:			; scratch area to use for SD block reading and writing
+	ds	512,0xa5
+
+
+.bios_stack_lo:
+	ds	64,0x55		; 32 stack levels = 64 bytes (init to analyze)
+.bios_stack:			; full descending stack starts /after/ the storage area 
+
+
+if $ < BOOT
+	ERROR THE BIOS WRAPPED AROUND PAST 0xffff
+endif
 
 
 	end
