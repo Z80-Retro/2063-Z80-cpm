@@ -142,6 +142,9 @@ endif
 	ld	(hl),0
 	ldir
 
+	ld	a,1
+	ld	(.bios_sdbuf_val),a	; mark .bios_sdbuf_trk as invalid
+
 	jp	.go_cpm
 
 
@@ -499,6 +502,32 @@ else
 
 	ld	hl,(.disk_track)	; HL = CP/M track number
 
+	; Check to see if the SD block in .bios_sdbuf is already the one we want
+	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
+	or	a			; is it a non-zero value?
+	jr	nz,.bios_read_block	; block buffer is invalid, read the SD block
+
+	ld	a,(.bios_sdbuf_trk)	; A = CP/M track LSB
+	cp	l			; is it the one we want?
+	jr	nz,.bios_read_block	; LSB does not match, read the SD block
+
+	ld	a,(.bios_sdbuf_trk+1)	; A = CP/M track MSB
+	cp	h			; is it the one we want?
+	jr	z,.bios_read_sd_ok	; The SD block in .bios_sdbuf is the one we want!
+
+.bios_read_block:
+if .debug >= 1
+	call	iputs
+	db	".bios_read cache miss: \0"
+	call	.debug_disk
+endif
+
+	; Assume all will go well reading the SD card block.
+	; We only need to touch this if we are going to actually read the SD card.
+	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
+	xor	a			; A = 0
+	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
+
 	; XXX This is a hack that won't work unless the disk partition < 0x10000
 	; XXX This has the SD card partition offset hardcoded in it!!!
 .sd_partition_base: equ	0x800
@@ -520,9 +549,11 @@ else
 	call	iputs
 	db	"BIOS_READ FAILED!\r\n\0"
 	ld	a,1			; tell CP/M the read failed
+	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
 	jp	.bios_read_ret
 
 .bios_read_sd_ok:
+
 	; calculate the CP/M sector offset address (.disk_sector*128)
 	ld	hl,(.disk_sector)	; must be 0..3
 	add	hl,hl			; HL *= 2
@@ -725,8 +756,13 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 .bios_alv_a_end:
 
+
+.bios_sdbuf_trk:		; The CP/M track number last left in the .bios_sdbuf
+	ds	2,0xff		; initial value = garbage
+.bios_sdbuf_val:		; The CP/M track number in .bios_sdbuf_trk is valid when this is 0
+	ds	1,0xff		; initial value = INVALID
 .bios_sdbuf:			; scratch area to use for SD block reading and writing
-	ds	512,0xa5
+	ds	512,0xa5	; initial value = garbage
 
 
 .bios_stack_lo:
