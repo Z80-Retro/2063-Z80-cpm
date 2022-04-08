@@ -119,6 +119,7 @@ SECTRN: JP      .bios_sectrn
 	ld	sp,.bios_stack		; use the private BIOS stack to get started
 
 	call	.init_console		; Note: console should still be initialized from the boot loader
+	call	.init_list		; initialize the printer interface
 
 if .debug > 0
 	call	iputs
@@ -340,8 +341,10 @@ endif
 ;
 ;##########################################################################
 .bios_list:
-	; XXX finish me
-	ret
+	jp	prn_out		; tail-call the driver output routine
+
+.init_list:
+	jp	prn_init	; tail-call the driver init routine
 
 ;##########################################################################
 ;
@@ -356,8 +359,7 @@ endif
 ; Clobbers AF
 ;##########################################################################
 .bios_prstat:
-	ld	a,0		; printer is never ready
-	ret
+	jp	prn_stat	; tail-call the driver status routine
 
 ;##########################################################################
 ;
@@ -745,6 +747,7 @@ include 'puts.asm'
 include 'hexdump.asm'
 include 'sdcard.asm'
 include 'spi.asm'
+include 'prn.asm'
 
 
 ;##########################################################################
