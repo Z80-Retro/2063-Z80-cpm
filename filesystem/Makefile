@@ -20,7 +20,11 @@ clean:
 	rm -rf `find adventure/* -name \*.zip -o -print`
 
 burn: retro.img
-	sudo dd if=retro.img of=/dev/sda1 bs=512
+	if [ `hostname` = "raspberrypi" ]; then \
+		sudo dd if=retro.img of=/dev/sda1 bs=512; \
+	else \
+		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
+	fi
 
-lsimg:
+lsimg: retro.img
 	cpmls -f z80-retro-2k-8m retro.img 
