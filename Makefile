@@ -2,8 +2,9 @@ SUBDIRS=\
 	boot \
 	tests \
 	hello \
-	cpm22
-
+	cpm22 \
+	retro \
+	filesystem
 
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
 ALL_DIRS=$(SUBDIRS:%=all-%)
