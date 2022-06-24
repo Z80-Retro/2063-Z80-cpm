@@ -8,6 +8,9 @@ retro.img: ../retro/retro.bin ../cpm22/filesystem/* adventure/adv-B03
 	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
 	cpmcp -f z80-retro-2k-8m retro.img ../cpm22/filesystem/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img adventure/adv-B03/* 0:
+	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
+		cpmcp -f z80-retro-2k-8m retro.img local/*/*/* 0: ; \
+	fi
 
 adventure/adv-B03: adventure/cpm-advent.zip
 	unzip -d adventure adventure/cpm-advent.zip
