@@ -534,7 +534,7 @@ endif
 	; print the R1 status byte
 	push	af
 	call	iputs
-	db	"SD CMD17 R1 error = 0x\0"
+	db	"\r\nSD CMD17 R1 error = 0x\0"
 	pop	af
 	call	hexdump_a
 	call	puts_crlf
@@ -545,7 +545,7 @@ endif
 .sd_cmd17_r1ok:
 
 	; read and toss bytes while waiting for the data token
-	ld      bc,0x400		; expect to wait a while for a reply
+	ld      bc,0x1000		; expect to wait a while for a reply
 .sd_cmd17_loop:
 	call    spi_read8		; (clobbers A, DE)
 	cp	0xff			; if a=0xff then command is not yet completed
@@ -563,8 +563,13 @@ endif
 	cp	0xfe			; A = data block token? (else is junk from the SD)
 	jr	z,.sd_cmd17_tokok
 
+	push	af
 	call	iputs
-	db	"SD CMD17 invalid response token\r\n\0"
+	db	"SD CMD17 invalid response token: 0x\0"
+	pop	af
+	call	hexdump_a
+	call	iputs
+	db	"\r\n\0"
 	jp	.sd_cmd17_err
 
 .sd_cmd17_tokok:
