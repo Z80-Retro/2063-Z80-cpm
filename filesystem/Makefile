@@ -11,8 +11,11 @@ retro.img: ../retro/retro.bin ../cpm22/filesystem/* adventure/adv-B03
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
 		cpmcp -f z80-retro-2k-8m retro.img local/*/*/* 0: ; \
 	fi
-	if [ `ls -1 progs/*/*.com progs/*/*.bas 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f z80-retro-2k-8m retro.img progs/*/*.com progs/*/*.bas 0: ; \
+	if [ `ls -1 progs/*/*.com 2>/dev/null | wc -l` -gt 0 ]; then\
+		cpmcp -f z80-retro-2k-8m retro.img progs/*/*.com 0: ; \
+	fi
+	if [ `ls -1 progs/*/*.bas 2>/dev/null | wc -l` -gt 0 ]; then\
+		cpmcp -f z80-retro-2k-8m retro.img progs/*/*.bas 0: ; \
 	fi
 
 world: clean all
