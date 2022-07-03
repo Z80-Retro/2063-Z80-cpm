@@ -30,7 +30,7 @@
 init_ctc_2:
 ;   ld      a,0x07      ; TC follows, Timer, Control, Reset
     ld      a,0x47      ; TC follows, Counter, Control, Reset
-    out     (ctc_1),a
+    out     (ctc_2),a
     ld      a,c
-    out     (ctc_1),a
+    out     (ctc_2),a
     ret
