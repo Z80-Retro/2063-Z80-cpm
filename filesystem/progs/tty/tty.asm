@@ -57,9 +57,9 @@ endif
 	;call	.pattern
 	;call	.p2
 	;call	.message_test
-	;call	.shift_test
 
 	call	.tx_startup
+	;call	.shift_test
 	call	.ipsum
 
 	ret
@@ -99,7 +99,8 @@ endif
 
 .shift_msg:
 	db	"abcdefghijklmnopqrstuvwxyz 01234567890~!@#$%^&*()-_=+[]{}|\r\n"
-	db	"a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z\r\n",0
+	db	"a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z\r\n"
+	db	"a-b?c:d$e3f!g&h#i8j'k(l)m.n,o9p0q1r4s\at5u7v;w2x/y6z\" !!\r\n",0
 
 ;***************************************************************************
 ;***************************************************************************
