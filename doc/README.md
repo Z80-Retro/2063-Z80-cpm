@@ -1,4 +1,4 @@
-# Waveform diagrams for FLASH programmer
+# Z80 Retro! Memory and SD Card Maps
 
 To compile this document into a pdf file requires the use of LaTex.
 Install LaTeX on Ubuntu or Raspberry Pi OS like this:
