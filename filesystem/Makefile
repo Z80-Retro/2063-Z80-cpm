@@ -1,5 +1,15 @@
 # Build a filesystem from the cpm22 distro files, retro.asm BIOS, and some
 # sample downloads like adventure.
+#
+# To create an image with CP/M distro plus adventure:
+# make retro.img
+#
+# To create an image with CP/M distro plus adventure and local additions:
+# make local
+#
+# To list the files that are in the created image:
+# make lsimg
+
 
 all: retro.img
 
@@ -8,6 +18,8 @@ retro.img: ../retro/retro.bin ../cpm22/filesystem/* adventure/adv-B03
 	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
 	cpmcp -f z80-retro-2k-8m retro.img ../cpm22/filesystem/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img adventure/adv-B03/* 0:
+
+local: retro.img
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
 		cpmcp -f z80-retro-2k-8m retro.img local/*/*/* 0: ; \
 	fi
@@ -17,6 +29,7 @@ retro.img: ../retro/retro.bin ../cpm22/filesystem/* adventure/adv-B03
 	if [ `ls -1 progs/*/*.bas 2>/dev/null | wc -l` -gt 0 ]; then\
 		cpmcp -f z80-retro-2k-8m retro.img progs/*/*.bas 0: ; \
 	fi
+
 
 world: clean all
 
