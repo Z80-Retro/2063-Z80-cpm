@@ -23,6 +23,33 @@
 ;****************************************************************************
 
 
+;
+; Memory banks:
+;
+; BANK     Usage
+;   0    SD cache bank 0
+;   1    SD cache bank 1
+;   2    SD cache bank 2
+;   3    SD cache bank 3
+;   4
+;   5
+;   6
+;   7
+;   8
+;   9
+;   A
+;   B
+;   C
+;   D
+;   E    CP/M zero page and low half of the TPA
+;   F    CP/M high half of the TPA, CCP, BDOS, and BIOS
+;
+
+
+.low_bank:	equ	0x0e	; The RAM BANK to use for the bottom 32K
+
+
+
 ;##########################################################################
 ; set .debug to:
 ;    0 = no debug output
@@ -110,8 +137,8 @@ SECTRN: JP      .bios_sectrn
 ;##########################################################################
 
 .bios_boot:
-	; This will select low-bank 0 and idle the SD card and printer
-	ld	a,gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel|gpio_out_prn_stb
+	; This will select low-bank E, idle the SD card, and idle the printer
+	ld	a,gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
 	ld	(gpio_out_cache),a
 	out	(gpio_out),a
 
@@ -979,6 +1006,10 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 .bios_alv_a_end:
 
 
+
+;##########################################################################
+; A single SD block cache
+;##########################################################################
 .bios_sdbuf_trk:		; The CP/M track number last left in the .bios_sdbuf
 	ds	2,0xff		; initial value = garbage
 .bios_sdbuf_val:		; The CP/M track number in .bios_sdbuf_trk is valid when this is 0
@@ -987,11 +1018,15 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 	ds	512,0xa5	; initial value = garbage
 
 
+;##########################################################################
+; Temporary stack used for BIOS calls needing more than a few stack levels.
+;##########################################################################
 .bios_stack_lo:
 	ds	64,0x55		; 32 stack levels = 64 bytes (init to analyze)
 .bios_stack:			; full descending stack starts /after/ the storage area 
 
 
+;##########################################################################
 if $ < BOOT
 	ERROR THE BIOS WRAPPED AROUND PAST 0xffff
 endif
