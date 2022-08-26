@@ -7,10 +7,10 @@ CPM22.Z80: cpm2-asm.zip
 	touch $@
 
 cpm2-asm.zip:
-	wget http://www.cpm.z80.de/download/cpm2-asm.zip
+	wget -nd http://www.cpm.z80.de/download/cpm2-asm.zip
 
 cpm22-b.zip:
-	wget http://www.cpm.z80.de/download/cpm22-b.zip
+	wget -nd http://www.cpm.z80.de/download/cpm22-b.zip
 
 filesystem: cpm22-b.zip
 	mkdir -p filesystem
