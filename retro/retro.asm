@@ -22,7 +22,7 @@
 ;
 ;****************************************************************************
 
-
+;****************************************************************************
 ;
 ; Memory banks:
 ;
@@ -44,7 +44,7 @@
 ;   E    CP/M zero page and low half of the TPA
 ;   F    CP/M high half of the TPA, CCP, BDOS, and BIOS
 ;
-
+;****************************************************************************
 
 .low_bank:	equ	0x0e	; The RAM BANK to use for the bottom 32K
 
@@ -57,7 +57,7 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-.debug:		equ	0
+.debug:		equ	1
 
 
 include	'io.asm'
@@ -111,8 +111,8 @@ SELDSK: JP      .bios_seldsk
 SETTRK: JP      .bios_settrk
 SETSEC: JP      .bios_setsec
 SETDMA: JP      .bios_setdma
-READ:   JP      .bios_read
-WRITE:  JP      .bios_write
+READ:   JP      bios_read
+WRITE:  JP      bios_write
 PRSTAT: JP      .bios_prstat
 SECTRN: JP      .bios_sectrn
 
@@ -143,7 +143,7 @@ SECTRN: JP      .bios_sectrn
 	out	(gpio_out),a
 
 	; make sure we have a viable stack
-	ld	sp,.bios_stack		; use the private BIOS stack to get started
+	ld	sp,bios_stack		; use the private BIOS stack to get started
 
 	call	.init_console		; Note: console should still be initialized from the boot loader
 	call	.init_list		; initialize the printer interface
@@ -170,8 +170,7 @@ endif
 	ld	(hl),0
 	ldir
 
-	ld	a,1
-	ld	(.bios_sdbuf_val),a	; mark .bios_sdbuf_trk as invalid
+	call	rw_init			; initialize anything needed for disk read/write 
 
 	jp	.go_cpm
 
@@ -214,7 +213,7 @@ endif
 
 .bios_wboot:
 
-	; We can't just blindly set SP=.bios_stack here because .bios_read will overwrite it!
+	; We can't just blindly set SP=bios_stack here because bios_read will overwrite it!
 	; But we CAN set to use other areas that we KNOW are not currently in use!
 	ld	sp,.bios_wboot_stack			; the .bios_dirbuf is garbage right now
 
@@ -224,9 +223,7 @@ if .debug >= 2
 	db	"\r\n.bios_wboot entered\r\n\0"
 endif
 
-	; mark the .bios_sdbuf as invalid
-	ld	a,1
-	ld	(.bios_sdbuf_val),a	; mark .bios_sdbuf_trk as invalid
+	call	rw_init			; initialize anything needed for disk read/write 
 
 	; reload the CCP and BDOS
 
@@ -246,9 +243,9 @@ endif
 .wboot_loop:
 	push	bc			; save the remaining sector count
 
-	call	.bios_read		; read 1 sector
+	call	bios_read		; read 1 sector
 
-	or	a			; .bios_read sets A=0 on success
+	or	a			; bios_read sets A=0 on success
 	jr	z,.wboot_sec_ok		; if read was OK, continue processing
 
 	; If there was a read error, stop.
@@ -260,7 +257,7 @@ endif
 
 .wboot_sec_ok:
 	; advance the DMA pointer by 128 bytes
-	ld	hl,(.disk_dma)		; HL = the last used DMA address
+	ld	hl,(bios_disk_dma)	; HL = the last used DMA address
 	ld	de,128
 	add	hl,de			; HL += 128
 	ld	b,h
@@ -268,13 +265,13 @@ endif
 	call	.bios_setdma
 
 	; increment the sector/track numbers
-	ld	a,(.disk_sector)	; A = last used sector number (low byte only for 0..3)
+	ld	a,(bios_disk_sector)	; A = last used sector number (low byte only for 0..3)
 	inc	a
 	and	0x03			; if A+1 = 4 then A=0
 	jr	nz,.wboot_sec		; if A+1 !=4 then do not advance the track number
 
 	; advance to the next track
-	ld	bc,(.disk_track)
+	ld	bc,(bios_disk_track)
 	inc	bc
 	call	.bios_settrk
 	xor	a			; set A=0 for first sector on new track
@@ -443,12 +440,12 @@ endif
 ;
 ;##########################################################################
 .bios_settrk:
-	ld	(.disk_track),bc
+	ld	(bios_disk_track),bc
 
 if .debug >= 2
 	call	iputs
 	db	".bios_settrk entered: \0"
-	call	.debug_disk
+	call	bios_debug_disk
 endif
 	ret
 
@@ -470,17 +467,17 @@ endif
 ;##########################################################################
 .bios_seldsk:
 	ld	a,c
-	ld	(.disk_disk),a		; XXX should we save this now or defer 
+	ld	(bios_disk_disk),a		; XXX should we save this now or defer 
 					; till after we validate the value?
 
 if .debug >= 2
 	call	iputs
 	db	".bios_seldsk entered: \0"
-	call	.debug_disk
+	call	bios_debug_disk
 endif
 
 	ld	hl,0			; HL = 0 = invalid disk 
-	ld	a,(.disk_disk)
+	ld	a,(bios_disk_disk)
 	or	a			; did drive A get selected?
 	ret	nz			; no -> error
 
@@ -495,12 +492,12 @@ endif
 ;
 ;##########################################################################
 .bios_setsec:
-	ld	(.disk_sector),bc
+	ld	(bios_disk_sector),bc
 
 if .debug >= 2
 	call	iputs
 	db	".bios_setsec entered: \0"
-	call	.debug_disk
+	call	bios_debug_disk
 endif
 
 	ret
@@ -516,12 +513,12 @@ endif
 ;
 ;##########################################################################
 .bios_setdma:
-	ld	(.disk_dma),bc
+	ld	(bios_disk_dma),bc
 
 if .debug >= 2
 	call	iputs
 	db	".bios_setdma entered: \0"
-	call	.debug_disk
+	call	bios_debug_disk
 endif
 
 	ret
@@ -533,32 +530,32 @@ endif
 ; Clobbers AF, C
 ;##########################################################################
 if .debug >= 1
-.debug_disk:
+bios_debug_disk:
 	call	iputs
 	db	'disk=0x\0'
 
-	ld	a,(.disk_disk)
+	ld	a,(bios_disk_disk)
 	call	hexdump_a
 
 	call    iputs
 	db	", track=0x\0"
-	ld	a,(.disk_track+1)
+	ld	a,(bios_disk_track+1)
 	call	hexdump_a
-	ld	a,(.disk_track)
+	ld	a,(bios_disk_track)
 	call	hexdump_a
 
 	call	iputs
 	db	", sector=0x\0"
-	ld	a,(.disk_sector+1)
+	ld	a,(bios_disk_sector+1)
 	call	hexdump_a
-	ld	a,(.disk_sector)
+	ld	a,(bios_disk_sector)
 	call	hexdump_a
 
 	call	iputs
 	db	", dma=0x\0"
-	ld	a,(.disk_dma+1)
+	ld	a,(bios_disk_dma+1)
 	call	hexdump_a
-	ld	a,(.disk_dma)
+	ld	a,(bios_disk_dma)
 	call	hexdump_a
 	call	puts_crlf
 
@@ -566,306 +563,15 @@ if .debug >= 1
 endif
 
 
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p19:
-; Assuming the drive has been selected, the track has been set, the sector
-; has been set, and the DMA address has been specified, the READ subroutine
-; attempts to read one sector based upon these parameters, and returns the
-; following error codes in register A:
-;
-;    0 no errors occurred
-;    1 non-recoverable error condition occurred
-;
-; When an error is reported the BDOS will print the message "BDOS ERR ON
-; x: BAD SECTOR".  The operator then has the option of typing <cr> to ignore
-; the error, or ctl-C to abort.
-;
-;##########################################################################
-.bios_read:
-if .debug >= 2
-	call	iputs
-	db	".bios_read entered: \0"
-	call	.debug_disk
-endif
-
-if 0
-	; fake a 'blank'/formatted sector
-	ld	hl,(.disk_dma)		; HL = buffer address
-	ld	de,(.disk_dma)
-	inc	de			; DE = buffer address + 1
-	ld	bc,0x007f		; BC = 127
-	ld	(hl),0xe5
-	ldir				; set 128 bytes from (hl) to 0xe5
-	xor	a			; A = 0 = OK
-else
-	; switch to a local stack (we only have a few levels when called from the BDOS!)
-	push	hl			; save HL into the caller's stack
-	ld	hl,0
-	add	hl,sp			; HL = SP
-	ld	sp,.bios_stack		; SP = temporary private BIOS stack area
-	push	hl			; save the old SP value in the BIOS stack
-
-	push	bc			; save the register pairs we will otherwise clobber
-	push	de			; this is not critical but may make WBOOT cleaner later
-
-	ld	hl,(.disk_track)	; HL = CP/M track number
-
-	; Check to see if the SD block in .bios_sdbuf is already the one we want
-	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
-	or	a			; is it a non-zero value?
-	jr	nz,.bios_read_block	; block buffer is invalid, read the SD block
-
-	ld	a,(.bios_sdbuf_trk)	; A = CP/M track LSB
-	cp	l			; is it the one we want?
-	jr	nz,.bios_read_block	; LSB does not match, read the SD block
-
-	ld	a,(.bios_sdbuf_trk+1)	; A = CP/M track MSB
-	cp	h			; is it the one we want?
-	jr	z,.bios_read_sd_ok	; The SD block in .bios_sdbuf is the one we want!
-
-.bios_read_block:
-if .debug >= 2
-	call	iputs
-	db	".bios_read cache miss: \0"
-	call	.debug_disk
-endif
-
-	; Assume all will go well reading the SD card block.
-	; We only need to touch this if we are going to actually read the SD card.
-	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
-	xor	a			; A = 0
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
-
-	; XXX This is a hack that won't work unless the disk partition < 0x10000
-	; XXX This has the SD card partition offset hardcoded in it!!!
-.sd_partition_base: equ	0x800
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
-
-	; push the 32-bit physical SD block number into the stack in little-endian order
-	ld	de,0
-	push	de			; 32-bit SD block number (big end)
-	push	hl			; 32-bit SD block number (little end)
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
-	call	sd_cmd17		; read the SD block
-	pop	hl			; clean the SD block number from the stack
-	pop	de
-
-	or	a			; was the SD driver read OK?
-	jr	z,.bios_read_sd_ok
-
-	call	iputs
-	db	"BIOS_READ FAILED!\r\n\0"
-	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
-	jp	.bios_read_ret
-
-.bios_read_sd_ok:
-
-	; calculate the CP/M sector offset address (.disk_sector*128)
-	ld	hl,(.disk_sector)	; must be 0..3
-	add	hl,hl			; HL *= 2
-	add	hl,hl			; HL *= 4
-	add	hl,hl			; HL *= 8
-	add	hl,hl			; HL *= 16
-	add	hl,hl			; HL *= 32
-	add	hl,hl			; HL *= 64
-	add	hl,hl			; HL *= 128
-
-	; calculate the address of the CP/M sector in the .bios_sdbuf
-	ld	bc,.bios_sdbuf
-	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
-
-	; copy the data of interest from the SD block
-	ld	de,(.disk_dma)		; target address
-	ld	bc,0x0080		; number of bytes to copy
-	ldir
-
-	xor	a			; A = 0 = read OK
-
-.bios_read_ret:
-	pop	de			; restore saved regs
-	pop	bc
-
-	pop	hl			; HL = original saved stack pointer
-	ld	sp,hl			; SP = original stack address
-	pop	hl			; restore the original  HL value
-endif
-
-	ret
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p19:
-; Write the data from the currently selected DMA address to the currently
-; selected drive, track, and sector.  The error codes given in the READ
-; command are returned in register A:
-;
-;    0 no errors occurred
-;    1 non-recoverable error condition occurred
-;
-; p34 adds: Upon entry the value of C will be useful for blocking
-; and deblocking a drive's physical sector sizes:
-;
-;  0 = normal sector write
-;  1 = write into a directory sector
-;  2 = first sector of a newly used block
-;
-; Return the following completion status in register A:
-;
-;    0 no errors occurred
-;    1 non-recoverable error condition occurred
-;
-; When an error is reported the BDOS will print the message "BDOS ERR ON
-; x: BAD SECTOR".  The operator then has the option of typing <cr> to ignore
-; the error, or ctl-C to abort.
-;
-;##########################################################################
-.bios_write:
-if .debug >= 1
-	push	bc
-	call	iputs
-	db	".bios_write entered, C=\0"
-	pop	bc
-	push	bc
-	ld	a,c
-	call	hexdump_a
-	call	iputs
-	db	": \0"
-	call	.debug_disk
-	pop	bc
-endif
-	; switch to a local stack (we only have a few levels when called from the BDOS!)
-	push	hl			; save HL into the caller's stack
-	ld	hl,0
-	add	hl,sp			; HL = SP
-	ld	sp,.bios_stack		; SP = temporary private BIOS stack area
-	push	hl			; save the old SP value in the BIOS stack
-
-	push	de			; save the register pairs we will otherwise clobber
-	push	bc
-
-	ld	hl,(.disk_track)	; HL = CP/M track number
-
-	; Check to see if the SD block in .bios_sdbuf is already the one we want
-	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
-	or	a			; is it a non-zero value?
-	jr	nz,.bios_write_miss	; block buffer is invalid, pre-read the SD block
-
-	ld	a,(.bios_sdbuf_trk)	; A = CP/M track LSB
-	cp	l			; is it the one we want?
-	jr	nz,.bios_write_miss	; LSB does not match, pre-read the SD block
-
-	ld	a,(.bios_sdbuf_trk+1)	; A = CP/M track MSB
-	cp	h			; is it the one we want?
-	jp	z,.bios_write_sdbuf	; The SD block in .bios_sdbuf is the one we want!
-
-.bios_write_miss:
-if .debug >= 1
-	call	iputs
-	db	".bios_write cache miss: \0"
-	call	.debug_disk
-endif
-
-	; Assume all will go well reading the SD card block.
-	; We only need to touch this if we are going to actually read the SD card.
-	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
-	xor	a			; A = 0
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
 
 
-	; if C==2 then we are writing into an alloc block (and therefore an SD block) that is not dirty
-	pop	bc			; restore C in case was clobbered above
-	push	bc
-	ld	a,2
-	cp	c
-	jr	nz,.bios_write_prerd
+; Pick the preferred flavor of SD read/write routines.
 
-	; padd the SD buffer with all 0xe5
-	ld	hl,.bios_sdbuf		; buffer to initialize
-	ld	de,.bios_sdbuf+1	; buffer+1
-	ld	bc,0x1ff		; number of bytes to initialize
-	ld	(hl),0xe5		; set the first byte to 0xe5
-	ldir				; set the rest of the bytes to 0xe5
-	jp	.bios_write_sdbuf	; go to write logic (skip the SD card pre-read)
+;include 'rw_stub.asm'
+;include 'rw_nocache.asm'
+include 'rw_dmcache.asm'
 
-.bios_write_prerd:
-	; pre-read the block so we can replace one sector and write it back
-	; XXX This is a hack that won't work unless the disk partition < 0x10000
-	; XXX This has the SD card partition offset hardcoded in it!!!
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
 
-	; push the 32-bit physical SD block number into the stack in little-endian order
-	ld	de,0
-	push	de			; 32-bit SD block number (big end)
-	push	hl			; 32-bit SD block number (little end)
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
-	call	sd_cmd17		; pre-read the SD block
-	pop	hl			; clean the SD block number from the stack
-	pop	de
-
-	or	a			; was the SD driver read OK?
-	jr	z,.bios_write_sdbuf
-
-	call	iputs
-	db	"BIOS_WRITE SD CARD PRE-READ FAILED!\r\n\0"
-	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
-	jp	.bios_write_ret
-
-.bios_write_sdbuf:
-	; calculate the CP/M sector offset address (.disk_sector*128)
-	ld	hl,(.disk_sector)	; must be 0..3
-	add	hl,hl			; HL *= 2
-	add	hl,hl			; HL *= 4
-	add	hl,hl			; HL *= 8
-	add	hl,hl			; HL *= 16
-	add	hl,hl			; HL *= 32
-	add	hl,hl			; HL *= 64
-	add	hl,hl			; HL *= 128
-
-	; calculate the address of the CP/M sector in the .bios_sdbuf
-	ld	bc,.bios_sdbuf
-	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
-	ld	d,h
-	ld	e,l			; DE = @ of cpm sector in the .bios_sdbuf
-
-	; copy the data of interest /into/ the SD block
-	ld	hl,(.disk_dma)		; source address
-	ld	bc,0x0080		; number of bytes to copy
-	ldir
-
-	; write the .bios_sdbuf contents to the SD card
-	ld      hl,(.disk_track)
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
-	ld	de,0
-	push	de			; SD block number to write
-	push	hl
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
-	call	sd_cmd24		; write the SD block
-	pop	hl			; clean the SD block number from the stack
-	pop	de
-
-	or	a
-	jr	z,.bios_write_ret
-
-	call	iputs
-	db	"BIOS_WRITE SD CARD WRITE FAILED!\r\n\0"
-	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
-
-.bios_write_ret:
-	pop	bc
-	pop	de			; restore saved regs
-
-	pop	hl			; HL = original saved stack pointer
-	ld	sp,hl			; SP = original stack address
-	pop	hl			; restore the original  HL value
-
-	ret
 
 
 ;##########################################################################
@@ -922,20 +628,20 @@ include 'prn.asm'
 gpio_out_cache: ds  1			; GPIO output latch cache
 
 ;##########################################################################
-; The .disk_XXX values are used to retain the most recent values that
+; The bios_disk_XXX values are used to retain the most recent values that
 ; have been set by the .bios_setXXX routines.
-; These are used by the .bios_read and .bios_write routines.
+; These are used by the bios_read and bios_write routines.
 ;##########################################################################
-.disk_dma:				; last set value of the DMA buffer address
+bios_disk_dma:				; last set value of the DMA buffer address
 	dw	0xa5a5
 
-.disk_track:				; last set value of the disk track
+bios_disk_track:			; last set value of the disk track
 	dw	0xa5a5
 
-.disk_disk:				; last set value of the selected disk
+bios_disk_disk:				; last set value of the selected disk
 	db	0xa5
 
-.disk_sector:				; last set value of of the disk sector
+bios_disk_sector:			; last set value of of the disk sector
 	dw	0xa5a5
 
 
@@ -1007,15 +713,6 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 
 
 
-;##########################################################################
-; A single SD block cache
-;##########################################################################
-.bios_sdbuf_trk:		; The CP/M track number last left in the .bios_sdbuf
-	ds	2,0xff		; initial value = garbage
-.bios_sdbuf_val:		; The CP/M track number in .bios_sdbuf_trk is valid when this is 0
-	ds	1,0xff		; initial value = INVALID
-.bios_sdbuf:			; scratch area to use for SD block reading and writing
-	ds	512,0xa5	; initial value = garbage
 
 
 ;##########################################################################
@@ -1023,7 +720,7 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 ;##########################################################################
 .bios_stack_lo:
 	ds	64,0x55		; 32 stack levels = 64 bytes (init to analyze)
-.bios_stack:			; full descending stack starts /after/ the storage area 
+bios_stack:			; full descending stack starts /after/ the storage area 
 
 
 ;##########################################################################
