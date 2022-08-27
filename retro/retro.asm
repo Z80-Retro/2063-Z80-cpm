@@ -568,8 +568,8 @@ endif
 ; Pick the preferred flavor of SD read/write routines.
 
 ;include 'rw_stub.asm'
-;include 'rw_nocache.asm'
-include 'rw_dmcache.asm'
+include 'rw_nocache.asm'
+;include 'rw_dmcache.asm'
 
 
 
