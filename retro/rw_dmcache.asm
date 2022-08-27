@@ -29,12 +29,17 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-.rw_debug:		equ	3
+.rw_debug:		equ	1
 
+
+; XXX This is a hack that won't work unless the disk partition < 0x10000
+; XXX This has the SD card partition offset hardcoded in it!!!
+.sd_partition_base: equ	0x800
 
 
 ;##########################################################################
-; Calc the cache slot number from the track number
+; Calc the cache slot number from the CP/M track number
+;
 ; HL = track number
 ; return: HL=slot number
 ;##########################################################################
@@ -43,17 +48,33 @@
 	ret
 
 ;##########################################################################
-; L=slot number
-; return: a=blank number
+; Convert a cache slot number in HL to the bank number wherein the slot 
+; is stored.
+;
+; L=slot number (H must be zero and is ignored here)
+; return: A=blank number
 ;##########################################################################
 .dms2b:
-	ld	a,l
-	rrca
-	rrca
+	ld	a,l		; BBxx xxxx
+	rrca			; xBBx xxxx
+	rrca			; xxBB xxxx
 	and	0x30		; 00BB 0000
-	ret;
-	
-	
+	ret
+
+;##########################################################################
+; Convert a cache slot number in HL to the address the slot is stored.
+;
+; L = slot number (H must be zero and is ignored here)
+; return: HL = slot address
+; Clobbers: AF
+;##########################################################################
+.dms2a:
+	ld	a,l		; A = xxAA AAAA
+	rlca			; A = xAAA AAAx
+	and	0x7e		; A = 0AAA AAA0
+	ld	h,a		; HL = 0AAA AAA0 xxAA AAAA
+	ld	l,0		; HL = 0AAA AAA0 0000 0000
+	ret
 
 ;##########################################################################
 ;
@@ -79,46 +100,51 @@ if .rw_debug >= 1
 endif
 
 
-	call	iputs
-	db	'DM cache slot = \0'
 
-	; calc the slot number from the CP/M track number
-	ld	hl,(bios_disk_track)
+	; Test the conversion routines
+
+	call	iputs
+	db	"DM cache slot=\0"
+
+	ld      hl,(bios_disk_track)
 	call	.dmt2s
 
+	ld	a,h
+	call	hexdump_a
 	ld	a,l
 	call	hexdump_a
 
-	; L = slot 
-	call	iputs
-	db	', bank = \0'
 
-	; calc bank the slot is in
+	call	iputs
+	db	", bank=\0"
+
+	ld      hl,(bios_disk_track)
+	call	.dmt2s
 	call	.dms2b
-	; A = bank (MSN)
 
 	call	hexdump_a
-
 
 
 	call	iputs
-	db	', address = \0'
+	db	', address=\0'
 
+	ld      hl,(bios_disk_track)
+	call	.dmt2s
+	call	.dms2a
+
+	ld	a,h
+	call	hexdump_a
 	ld	a,l
-	rlca
-	and	0x7e		; 0111 1110 (MSB of the slot address within the selected bank)
 	call	hexdump_a
-	xor	a		; LSB is always 0
-	call	hexdump_a
-	
 
 	call	puts_crlf
 
 
 
-	; XXX This is a hack that won't work unless the disk partition < 0x10000
-	; XXX This has the SD card partition offset hardcoded in it!!!
-.sd_partition_base: equ	0x800
+
+
+
+
 
 if 0
 	; fake a 'blank'/formatted sector
