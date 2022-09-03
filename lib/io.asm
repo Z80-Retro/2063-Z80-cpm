@@ -51,6 +51,10 @@ gpio_out_a16:		equ	0x20
 gpio_out_a17:		equ	0x40
 gpio_out_a18:		equ	0x80
 
+; a bitmask representing all of the lobank address bits 
+gpio_out_lobank:	equ	0|(gpio_out_a15|gpio_out_a16|gpio_out_a17|gpio_out_a18)
+
+
 ; bit-assignments for General Purpose input port 
 gpio_in_prn_err:	equ	0x01
 gpio_in_prn_stat:	equ	0x02
