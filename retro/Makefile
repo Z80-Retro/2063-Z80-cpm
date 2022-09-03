@@ -21,4 +21,5 @@ cpm22.asm: ../cpm22/CPM22.Z80
 world: clean all
 
 
-retro.bin: cpm22.asm retro.asm
+retro.bin: cpm22.asm retro.asm rw_dmcache.asm rw_nocache.asm rw_stub.asm
+
