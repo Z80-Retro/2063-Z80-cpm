@@ -22,6 +22,34 @@
 ;****************************************************************************
 
 
+;****************************************************************************
+;
+; BANK     Usage
+;   0    SD cache bank 0
+;   1    SD cache bank 1
+;   2    SD cache bank 2
+;   3    SD cache bank 3
+;   4
+;   5
+;   6
+;   7
+;   8
+;   9
+;   A
+;   B
+;   C
+;   D    DM Cache tag table
+;   E    CP/M zero page and low half of the TPA *
+;   F    CP/M high half of the TPA, CCP, BDOS, and BIOS *
+;
+;  * These banks are controlled by the BIOS.
+;
+;****************************************************************************
+
+
+
+
+
 ;##########################################################################
 ; set .rw_debug to:
 ;    0 = no debug output
