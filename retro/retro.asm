@@ -170,6 +170,7 @@ endif
 	ld	(hl),0
 	ldir
 
+	; Either ensure the stack is in high RAM or disable IRQs to call rw_init!
 	call	rw_init			; initialize anything needed for disk read/write 
 
 	jp	.go_cpm
@@ -223,7 +224,9 @@ if .debug >= 2
 	db	"\r\n.bios_wboot entered\r\n\0"
 endif
 
-	call	rw_init			; initialize anything needed for disk read/write 
+	; XXX Should not need to reinitialize the cache for a warm boot
+	; Either ensure the stack is in high RAM or disable IRQs to call rw_init!
+	;call	rw_init			; initialize anything needed for disk read/write 
 
 	; reload the CCP and BDOS
 
@@ -345,7 +348,17 @@ endif
 ;
 ;##########################################################################
 .bios_conin:
+if 1
 	jp	con_rx_char
+else
+	; a simple hack to let us dump status on demand
+	call	con_rx_char
+	cp	0x1B			; escape key??
+	ret	nz			; if not an escape then return
+	call	z,rw_debug_wedge	; else tail-call the debug wedge
+	ld	a,0x1B			; restore the trigger key value
+	ret
+endif
 
 ;##########################################################################
 ;
@@ -717,6 +730,8 @@ bios_disk_sector:			; last set value of of the disk sector
 
 ;##########################################################################
 ; Temporary stack used for BIOS calls needing more than a few stack levels.
+;
+; WARNING: This is expected to be in memory that is NOT bank-switchable!
 ;##########################################################################
 .bios_stack_lo:
 	ds	64,0x55		; 32 stack levels = 64 bytes (init to analyze)
