@@ -4,6 +4,10 @@
 \hoffset=-.75in
 \voffset=-.8in
 
+\usepackage{ifthen}
+\usepackage{stringstrings}  % so can count characters in a string
+\usepackage{xstring}        % so can count characters in a string
+
 
 \usepackage[pass]{geometry}
 %\usepackage[hypertex]{hyperref}
@@ -90,13 +94,20 @@
 \begin{tikzpicture}[line width=.3mm]%[x=.4cm,y=.3cm]
 
 	% draw backgrounds first so is behind everything else
-	\fill [yellow] (1,1) rectangle (3,12);
-	\fill [green] (1,12) rectangle (3,16);
-	\fill [cyan] (1,0) rectangle (3,1);
+	\fill [green] (1,12) rectangle (3,16);		% 16K load region
+	\fill [yellow] (1,8) rectangle (3,13.25);	% TPA hi
+	\fill [green] (2.6,12) rectangle (3,16);	% 16K load region (left overlay)
+	\fill [yellow] (1,8) rectangle (1.4,14.6);	% TPA hi (left overlay)
+
+	\fill [cyan] (9,0) rectangle (11,1);	% zero-page in bank 14
+	\fill [yellow] (11,0) rectangle (13,4);	% TPA hi
+	\fill [yellow] (9,1) rectangle (13,8);	% TPA lo
 
 	% draw the colors into bank 15 as well to reinforce it is a copy
-	\fill [yellow] (11,0) rectangle (13,4);
-	\fill [green] (11,4) rectangle (13,8);
+	\fill [green] (11,4) rectangle (13,8);		% 16K load region
+	\fill [yellow] (11,0) rectangle (13,5.25);	% TPA hi
+	\fill [green] (12.6,4) rectangle (13,8);	% 16K load region (right overlay)
+	\fill [yellow] (11,0) rectangle (11.4,6.6);	% TPA hi (right overlay)
 
 
 	\draw (1, 0) -- (1, 16);	% 64K left line
@@ -104,55 +115,65 @@
 
 
 	\draw (1-.2,16) -- (3,16);	% top horiz
-	\node at (0, 16-.2) {\tt 0xFFFF};
+	\node [text width=4cm, align=right] at (-1.3, 16-.2) {\tt 0xFFFF};
 
 	\draw (1-.2,14.625) -- (3,14.625);	% BIOS
-	\node at (0, 14.625+.2) {\tt 0xEA00};
+	\node [text width=4cm, align=right] at (-1.3, 14.625+.2) {\tt 0xEA00};
 	\node at (2,15.1+.2) {BIOS};
 
 	\draw (1-.2,13.75) -- (3,13.75);	% BDOS
-	\node at (0, 13.75+.2) {\tt 0xDC00};
+	\node [text width=4cm, align=right] at (-1.3, 13.75+.2) {\tt FBASE = 0xDC00};
 	\node at (2,14+.2) {BDOS};
-	\node at (4.1,13.75+.2) {\parbox{2cm}{\tt FBASE}};
 
 	\draw (1-.2,13.25) -- (3,13.25);	% CPP
-	\node at (0, 13.25+.2) {\tt 0xD400};
+	\node [text width=4cm, align=right] at (-1.3, 13.25+.2) {\tt CPM\_BASE = 0xD400};
 	\node at (2,13.25+.2) {CCP};
-	\node at (4.1, 13.25+.2) {\parbox{2cm}{\tt CPM\_BASE}};
 
 	\draw (1-.2,12) -- (3,12);	% LOAD_BASE
-	\node at (0, 12+.2) {\tt 0xC000};
-	\node at (4.1, 12+.2) {\parbox{2cm}{\tt LOAD\_BASE}};
+	\node [text width=4cm, align=right] at (-1.3, 12+.2) {\tt LOAD\_BASE = 0xC000};
 
-%	% The 16K size arrow
-%	\draw[dashed] (3,16) -- (5,16);	% right-line @ 64K
-%	\draw[dashed] (3,12) -- (5,12);	% right-line @ 48K
-%	\draw[<->] (5,16) -- (5,12);
-%	\node at (6.1,14) {\parbox{2cm}{16K}};
+	\draw [decorate, decoration = {calligraphic brace}] (3.2,16) -- (3.2,12);
+	\node [text width=2cm, align=left] at (4.3,14) {16KiB};
 
-	\draw [decorate, decoration = {calligraphic brace}] (5,16) -- (5,12);
-	\node at (6.2,14) {\parbox{2cm}{16KiB}};
+	\draw [decorate, decoration = {calligraphic brace}] (4.5,16) -- (4.5,8);
+	\node [text width=4cm, align=left] at (6.65,12) {32KiB (Bank 15 Copy)};
 
-	\draw [decorate, decoration = {calligraphic brace}] (6.3,16) -- (6.3,8);
-	\node at (9.5,12) {\parbox{6cm}{32KiB (Bank 15 Copy)}};
+	% Draw an arrow showing the copy of Bank 15
+	%\draw[blue,->](12,8.1) to [out=90,in=0](8.6,12);
+	%\draw[blue,->](13.6,4) to [out=80,in=0](8.6,12);
+	\draw[ultra thick, blue,->](13.6,4) .. controls (16,6.4) and (16,13) .. (8.4,12);	
 
 
-	\draw (1-.2,1) -- (3,1);	% TPA bottom
-	\node at (0, 1+.2) {\tt 0x0100};
-	\node at (2,7) {TPA};
-	%\draw[<->] (1.4,1) -- (1.4,12);	% vertical TPA arrow
-	\node at (4.1, 1+.2) {\parbox{2cm}{\tt TPA\_BASE}};
+	% label the regions in bank 15 too
+	\draw (11,6.625) -- (13,6.625);	% BIOS
+	\node at (12,7.1+.2) {BIOS};
+	\draw (11,5.75) -- (13,5.75);	% BDOS
+	\node at (12,6+.2) {BDOS};
+	\draw (11,5.25) -- (13,5.25);	% CPP
+	\node at (12,5.25+.2) {CCP};
+	\draw (11,4) -- (13,4);	% LOAD_BASE
 
-	\draw (1-.2,.5) -- (3,.5);	% default DMA buffer
-	\node at (0, .5+.2) {\tt 0x0080};
-	\node at (2,.5+.2) {I/O BUF};
+
+	\draw (1-.2,1) -- (,1);	% TPA bottom
+	\draw (9,1) -- (11,1);	% TPA bottom
+	\node [text width=4cm, align=right] at (-1.3, 1+.2) {\tt TPA\_BASE = 0x0100};
+	\draw [decorate, decoration = {calligraphic brace}] (-.45,1) -- (-.45,13.2);
+	\node [text width=.9cm, align=right] at (-1.1, 7.1) {\small\it TPA};
+
+	\draw [decorate, decoration = {calligraphic brace}] (-.45,13.3) -- (-.45,16);
+	\node [text width=.9cm, align=right] at (-1.1, 14.6) {\small\it O/S};
+
+
+	\draw (1-.2,.5) -- (1,.5);	% default DMA buffer
+	\draw (9,.5) -- (11,.5);	% default DMA buffer
+	\node [text width=4cm, align=right] at (-1.3, .5+.2) {\tt 0x0080};
+	\node at (10,.5+.2) {I/O BUF};
 
 	\draw (1-.2,0) -- (3,0);	% bottom horiz
-	\node at (0, 0+.2) {\tt 0x0000};
-	\node at (4.1, 0+.2) {\parbox{2cm}{\tt BOOT}};
+	\node [text width=4cm, align=right] at (-1.3, 0+.2) {\tt BOOT = 0x0000};
 
 
-	\node at (0, 8+.2) {\tt 0x8000};
+	\node [text width=4cm, align=right] at (-1.3, 8+.2) {\tt 0x8000};
 
 	% le'other 15 memory banks
 	\foreach \x in {1,...,5}%
@@ -163,7 +184,10 @@
 	\node at (6, 3) {Bank 2};
 	\node at (8, 3) {\ldots};
 	\node at (10, 3) {Bank 14};
+		\node at (10, 2) {TPA lo};
 	\node at (12, 3) {Bank 15};
+		\node at (12, 2) {TPA hi};	% in right-side bank 15
+		\node at (2, 10) {TPA hi};	% in top-copy of bank 15
 
 	\draw (3,0) -- (7.9,0);		% 32K bottom horizontal
 	\draw (8.1,0) -- (3+2*5,0);	% 32K bottom horizontal
@@ -175,13 +199,15 @@
 	\draw[densely dotted] (7.9,7.9) -- (7.9,8.1); % vert-left marker
 	\draw[densely dotted] (8.1,7.9) -- (8.1,8.1); % vert-right marker
 
-%	\draw[dashed] (13,8) -- (14,8);	% right-line @ 32K
-%	\draw[dashed] (13,0) -- (14,0);	% right-line @ 32K
-%	\draw[<->] (14,0) -- (14,8);
-%	\node at (15.1,4) {\parbox{2cm}{32K}};
-
 	\draw [decorate, decoration = {calligraphic brace, mirror}] (13.4,0) -- (13.4,8);
 	\node at (14.6,4) {\parbox{2cm}{32KiB}};
+
+
+	\draw [decorate, decoration = {calligraphic brace}] (9-.05,-.3) -- (1,-.3);		% bottom cache
+	\node [text width=4cm, align=center] at (5, -.7) {I/O Cache};
+
+	\draw [decorate, decoration = {calligraphic brace}] (13,-.3) -- (9+.05,-.3);	% bottom main memory
+	\node [text width=4cm, align=center] at (11, -.7) {Main Memory};
 
 \end{tikzpicture}
 
@@ -267,11 +293,268 @@
 	% expansion lines
 	\draw[densely dotted] (3, 16)to[out=0,in=180](p1top);
 	\draw[densely dotted] (3, 0)to[out=0,in=180](p1bot);
-	
-
-
 
 \end{tikzpicture}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+\input{castellatedboxes}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand\DrawDMTrack[1]{
+    \StrLen{#1}[\numchars]
+    \begin{scope}[shift={(0,.75)}]
+    	\DrawInsnBitstring{\numchars}{#1}{CP/M Track}
+		\DrawInsnBoxSeg{\numchars}{15}{0}{track}
+    \end{scope}
+
+    \DrawHexMarkersRel{\numchars}
+}
+
+
+\newcommand\DrawInsnBoxLabelsDMTag{
+	\DrawInsnBoxSeg{\numchars}{7}{7}{inv}
+	\DrawInsnBoxSeg{\numchars}{6}{6}{}
+	\DrawInsnBoxSeg{\numchars}{5}{0}{track hi}
+}
+\newcommand\DrawDMTag[1]{
+    \StrLen{#1}[\numchars]
+    \begin{scope}[shift={(0,.75)}]
+    	\DrawInsnBitstring{\numchars}{#1}{Tag}
+		\DrawInsnBoxLabelsDMTag
+    \end{scope}
+    \DrawHexMarkersRel{\numchars}
+}
+
+
+
+
+\newcommand\DrawDMSlot[1]{
+    \StrLen{#1}[\numchars]
+    \begin{scope}[shift={(0,.75)}]
+    	\DrawInsnBitstring{\numchars}{#1}{DM Slot}
+		\DrawInsnBoxSeg{\numchars}{15}{0}{slot}
+    \end{scope}
+    \DrawHexMarkersRel{\numchars}
+}
+
+\newcommand\DrawDMSlotAddress[1]{
+    \StrLen{#1}[\numchars]
+    \begin{scope}[shift={(0,.75)}]
+    	\DrawInsnBitstring{\numchars}{#1}{RAM Address}
+		\DrawInsnBoxSeg{\numchars}{15}{0}{slot\_address}
+    \end{scope}
+    \DrawHexMarkersRel{\numchars}
+}
+
+\newcommand\DrawDMRamBank[1]{
+    \StrLen{#1}[\numchars]
+    \begin{scope}[shift={(0,.75)}]
+    	\DrawInsnBitstring{\numchars}{#1}{RAM Bank}
+		\DrawInsnBoxSeg{\numchars}{7}{4}{bank\_addr}
+		\DrawInsnBoxSeg{\numchars}{3}{0}{}
+    \end{scope}
+    \DrawHexMarkersRel{\numchars}
+}
+
+% #1 total characters/width
+% #2 MSB position
+% #3 LSB position
+% #4 the segment label
+\newcommand\DrawInsnBoxSegTop[4]{
+    \pgfmathsetmacro\leftpos{int(#1-#2)}
+    \pgfmathsetmacro\rightpos{int(#1-#3)}
+
+%    \draw (\leftpos-.5,-.75) -- (\rightpos+.5,-.75);    % box bottom
+    \draw (\leftpos-.5,1.75) -- (\rightpos+.5,1.75);    % box top
+    \draw (\leftpos-.5,.25) -- (\leftpos-.5, 2.5);     % left end
+    \draw (\rightpos+.5,.25) -- (\rightpos+.5, 2.5);   % right end
+    \node at (\leftpos,2.2) {\tiny#2};
+    \draw(\rightpos,2.2) node{\tiny#3};
+
+    \pgfmathsetmacro\posn{#1-#2+(#2-#3)/2}
+    \pgfmathsetmacro\range{int(#2-#3+1)}
+    \node at (\posn,1.2) {\small#4};            % the field label
+
+%    \begin{scope}[shift={(0,-.7)}]\InsnBoxFieldWidthArrow{#2}{#3}\end{scope}
+}
+
+% #1 total characters/width
+% #2 MSB position
+% #3 LSB position
+\newcommand\DrawInsnBoxSegBtm[3]{
+    \pgfmathsetmacro\leftpos{int(#1-#2)}
+    \pgfmathsetmacro\rightpos{int(#1-#3)}
+
+    \draw (\leftpos-.5,-.75) -- (\rightpos+.5,-.75);    % box bottom
+    \draw (\leftpos-.5,-.75) -- (\leftpos-.5, 2.5);     % left end
+    \draw (\rightpos+.5,-.75) -- (\rightpos+.5, 2.5);   % right end
+
+	\begin{scope}[shift={(0,-.7)}]\InsnBoxFieldWidthArrow{#1}{#2}{#3}\end{scope}
+}
+
+% #1 total characters/width
+% #2 MSB position
+% #3 LSB position
+\newcommand\DrawInsnBoxSegMid[3]{
+    \pgfmathsetmacro\leftpos{int(#1-#2)}
+    \pgfmathsetmacro\rightpos{int(#1-#3)}
+
+    \draw (\leftpos-.5,-.5) -- (\leftpos-.5, .75);     % left end
+    \draw (\rightpos+.5,-.5) -- (\rightpos+.5, .75);   % right end
+}
+
+
+\newcommand\DrawTagTop{
+	\DrawInsnBoxSegTop{8}{7}{7}{inv}
+	\DrawInsnBoxSegTop{8}{6}{6}{}
+	\DrawInsnBoxSegTop{8}{5}{0}{tag}
+}
+
+% #1 bit string value
+\newcommand\DrawTagMid[1]{
+	\StrLen{#1}[\numchars]
+	\DrawInsnBoxSegMid{\numchars}{7}{7}
+	\DrawInsnBoxSegMid{\numchars}{6}{6}
+	\DrawInsnBoxSegMid{\numchars}{5}{0}
+
+	\DrawInsnBitstring{\numchars}{#1}{}
+}
+
+\newcommand\DrawTagBtm{
+	\DrawInsnBoxSegBtm{8}{7}{7}
+	\DrawInsnBoxSegBtm{8}{6}{6}
+	\DrawInsnBoxSegBtm{8}{5}{0}
+    \begin{scope}[shift={(0,-.75)}]\DrawHexMarkersRel{\numchars}\end{scope}
+}
+
+
+\newcommand\DrawTagTable{
+	\begin{scope}[shift={(0,.75)}]
+		\StrLen{v0tttttt}[\numchars]
+		\DrawTagTop
+
+		\draw [decorate, decoration = {calligraphic brace}] (0,-7) -- (0,.5);
+		\node[text width=1cm, align=left] at (-.25, -3.25) {\small 256};
+
+		\node[text width=3cm, align=right] at (9, -5) {Tag Table};
+
+
+		\DrawTagMid{v0cdefgh}
+		\begin{scope}[shift={(0,-1.25)}]\DrawTagMid{v0cdefgh}\end{scope}
+		\begin{scope}[shift={(0,-2.5)}]\DrawTagMid{v0cdefgh}\end{scope}
+		\begin{scope}[shift={(0,-3.75)}]\DrawTagMid{v0cdefgh}\end{scope}
+		\begin{scope}[shift={(0,-5.0)}]\DrawTagMid{. . . . }\end{scope}
+		\begin{scope}[shift={(0,-6.25)}]
+			\DrawTagMid{v0cdefgh}
+			\DrawTagBtm
+		\end{scope}
+
+	\end{scope}
+}
+
+
+\newcommand\DrawTrackDecode{
+	\BeginTikzPicture
+	\begin{scope}[shift={(0,-1.5)}]
+
+		\DrawDMTrack{abcdefghijklmnpq}
+
+		\pgfmathsetmacro\ArrowNorth{\BitBoxArrowTailInset}
+		\pgfmathsetmacro\ArrowSouth{\BitBoxArrowHeadInset}
+
+		% arrows from track to tag 
+		\draw[blue,->](3,\ArrowNorth)to[out=270,in=90](3,\ArrowSouth);
+		\draw[blue,->](4,\ArrowNorth)to[out=270,in=90](4,\ArrowSouth);
+		\draw[blue,->](5,\ArrowNorth)to[out=270,in=90](5,\ArrowSouth);
+		\draw[blue,->](6,\ArrowNorth)to[out=270,in=90](6,\ArrowSouth);
+		\draw[blue,->](7,\ArrowNorth)to[out=270,in=90](7,\ArrowSouth);
+		\draw[blue,->](8,\ArrowNorth)to[out=270,in=90](8,\ArrowSouth);
+
+
+		% arrows from track to slot 
+		\draw[blue,->](9,\ArrowNorth)to[out=270,in=90](21,\ArrowSouth);
+		\draw[blue,->](10,\ArrowNorth)to[out=270,in=90](22,\ArrowSouth);
+		\draw[blue,->](11,\ArrowNorth)to[out=270,in=90](23,\ArrowSouth);
+		\draw[blue,->](12,\ArrowNorth)to[out=270,in=90](24,\ArrowSouth);
+		\draw[blue,->](13,\ArrowNorth)to[out=270,in=90](25,\ArrowSouth);
+		\draw[blue,->](14,\ArrowNorth)to[out=270,in=90](26,\ArrowSouth);
+		\draw[blue,->](15,\ArrowNorth)to[out=270,in=90](27,\ArrowSouth);
+		\draw[blue,->](16,\ArrowNorth)to[out=270,in=90](28,\ArrowSouth);
+
+	\end{scope}
+
+
+	% tag table
+	\begin{scope}[shift={(0,-21)}]
+		\DrawTagTable
+	\end{scope}
+
+	% slot number
+	\begin{scope}[shift={(12,-21)}]
+		\DrawDMSlot{00000000ijklmnpq}
+
+		\pgfmathsetmacro\ArrowNorth{\BitBoxArrowTailInset}
+		\pgfmathsetmacro\ArrowSouth{\BitBoxArrowHeadInset}
+
+		% arrows into the RAM bank
+		\draw[red,->](9,\ArrowNorth)to[out=270,in=90](-11,-14);
+		\draw[red,->](10,\ArrowNorth)to[out=270,in=90](-10,-14);
+
+		% arrows into the RAM address
+		\draw[blue,->](11,\ArrowNorth)to[out=270,in=90](2,-14);
+		\draw[blue,->](12,\ArrowNorth)to[out=270,in=90](3,-14);
+		\draw[blue,->](13,\ArrowNorth)to[out=270,in=90](4,-14);
+		\draw[blue,->](14,\ArrowNorth)to[out=270,in=90](5,-14);
+		\draw[blue,->](15,\ArrowNorth)to[out=270,in=90](6,-14);
+		\draw[blue,->](16,\ArrowNorth)to[out=270,in=90](7,-14);
+
+		% the arrow into the tag table
+		\draw[blue,->](.5,.75)to[out=180,in=0](-3.5,-3);
+
+	\end{scope}
+
+	% bank number
+	\begin{scope}[shift={(-2,-38.5)}]
+		\DrawDMRamBank{00ij0000}
+	\end{scope}
+
+	% slot RAM address
+	\begin{scope}[shift={(12,-38.5)}]
+		\DrawDMSlotAddress{0klmnpq000000000}
+	\end{scope}
+
+	\EndTikzPicture
+}
+
+
+
+
+
+
+\clearpage
+
+\begin{center}
+{\huge Z80-Retro! Direct Mapped Cache}
+\end{center}
+\vspace{.5in}
+
+\begin{center}
+\DrawTrackDecode
+\end{center}
+
+
+
+
+
 
 
 \end{document}
