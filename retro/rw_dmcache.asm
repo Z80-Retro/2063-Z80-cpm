@@ -94,8 +94,8 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-;.rw_debug:		equ	3
-.rw_debug:		equ	0
+.rw_debug:		equ	3
+;.rw_debug:		equ	0
 
 .cache_tag_bank: 	equ	0xd0	; defined in terms of the GPIO port bits 
 ;.cache_tag_base:	equ	0	; the first tag table entry MUST be at 0x0000!
@@ -156,7 +156,7 @@
 ;	are possible, either the stack must be in high-memory or the
 ;	IRQs must be disabled before calling this function.
 ;
-; HL = slot number ((H must be zero and is ignored here)
+; HL = slot number
 ; return: A = cache tag value
 ; Clobbers: H
 ;##########################################################################
@@ -357,7 +357,7 @@ if .rw_debug >= 1
 	call	hexdump_a
 
 
-	; show the current trackj number in the slot
+	; show the current track number in the slot
 	call	iputs
 	db	', track=\0'
 

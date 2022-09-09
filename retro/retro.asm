@@ -57,7 +57,7 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-.debug:		equ	1
+.debug:		equ	0
 
 
 include	'io.asm'
