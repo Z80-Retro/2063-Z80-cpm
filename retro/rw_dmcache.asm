@@ -426,15 +426,13 @@ endif
 
 	; select the proper RAM bank for the given slot
 	ld      hl,(bios_disk_track)
-	push	hl			; save the track number
 	call	.dm_trk2slt
 	call	.dm_slt2bnk
 	ld	d,a			; D = bank number in high 4-bits
 
 	; Is the target track number in the cache? 
 
-	pop	hl			; HL = CP/M track number
-	push	hl			; save the track number
+	ld      hl,(bios_disk_track)
 	call	.dm_trk2slt		; HL=slot number
 	call	.dm_slt2trk		; HL=track number currently in the target slot
 
@@ -459,7 +457,7 @@ endif
 	; Note: The cache slot's track number will be 0xffff if the slot is empty. 
 	; Track 0xffff is impossible when CP/M tracks have more than one sector in them.
 
-	pop	de			; DE = the CP/M track number we want
+	ld      de,(bios_disk_track)	; DE = the CP/M track number we want
         or	a			; clear the CY flag
         sbc     hl,de                   ; HL = got - want
         jp      z,.read_cache_hit	; if equal then is in the cache
@@ -486,9 +484,9 @@ endif
 	; calculate the slot address within the selected bank
 	ld	hl,(bios_disk_track)
 	call	.dm_trk2slt
-	call	.dm_slt2adr
+	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
 	ld	d,h
-	ld	e,l			; DE = target slot buffer address to read the 512-byte block
+	ld	e,l			; DE = HL
 
 if .rw_debug >= 3
 	call	iputs
@@ -545,7 +543,7 @@ endif
 	call	.dm_trk2slt
 	call	.dm_slt2adr
 	ld	d,h
-	ld	e,l			; DE = target slot buffer address to read the 512-byte block
+	ld	e,l			; DE = target slot buffer address of the track
 
 	; calculate the CP/M sector offset address (bios_disk_sector*128)
 	ld	hl,(bios_disk_sector)	; must be 0..3
