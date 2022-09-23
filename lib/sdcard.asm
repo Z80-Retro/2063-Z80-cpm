@@ -758,6 +758,7 @@ endif
 	call	spi_read8		; clobber A, DE
 	cp	0xff
 	jr	nz,.sd_cmd24_drc
+	dec	bc
 	ld	a,b
 	or	c
 	jr	nz,.sd_cmd24_wdr
