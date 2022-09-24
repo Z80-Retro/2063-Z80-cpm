@@ -282,6 +282,602 @@ endif
 
 
 
+
+;************************************************************************
+; Convert a CP/M track number & sector to the address of the sector
+; in the appropriate cache slot.
+;
+; HL=CP/M track number
+; BC=CP/M sector number
+;
+; Clobbers everything
+;************************************************************************
+.dm_trksec2addr:
+	push	bc
+	call	.dm_trk2slt
+	call	.dm_slt2adr
+	ld	d,h
+	ld	e,l			; DE = target slot buffer address of the track
+
+	; calculate the CP/M sector offset address (bios_disk_sector*128)
+	pop	hl			; HL=CP/M sector number, must be 0..3
+	add	hl,hl			; HL *= 2
+	add	hl,hl			; HL *= 4
+	add	hl,hl			; HL *= 8
+	add	hl,hl			; HL *= 16
+	add	hl,hl			; HL *= 32
+	add	hl,hl			; HL *= 64
+	add	hl,hl			; HL *= 128
+
+	; calculate the address of the CP/M sector in the .bios_sdbuf
+	add	hl,de			; HL = @ of cpm sector in the cache
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.dm_trksec2addr sector addr=\0'
+	ld	a,h
+	call	hexdump_a
+	ld	a,l
+	call	hexdump_a
+endif
+	ret
+
+
+
+
+
+if 0 ;not yet
+;************************************************************************
+; Special case cache 'fill' logic to padd a slot with 0xe5 when CP/M
+; wants to write into a sector in an as-yet unused allocation block.
+;
+; HL=track number
+;************************************************************************
+.cache_slot_padd:
+
+	push	hl			; save the track number for repeated use later 
+
+	call	.dm_trk2slt
+	call	.dm_slt2bnk
+	ld	d,a			; D = bank number in high 4-bits
+
+	; select the RAM bank with the target cache slot in it
+	ld      a,(gpio_out_cache)	; get current value of the GPIO port
+	and	(~gpio_out_lobank)&0x0ff	; zero the RAM bank bits
+	or	d			; set the bank to that with the desired slot
+	out     (gpio_out),a		; select the cache tag bank
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.cache_slot_padd slot bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	; calculate the slot address within the selected bank
+	pop	hl			; HL = the CP/M track number we want
+	push	hl
+	call	.dm_trk2slt
+	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
+	ld	d,h
+	ld	e,l			; DE = HL
+
+	ld	(hl),0xe5		; HL=first slot byte address
+	inc	de			; DE=second slot byte address
+	ld	bc,0x007f		; padd the remaining 127 bytes
+	ldir
+
+	; Update the cache tag for the slot that we just replaced
+	pop	hl			; HL = the CP/M track number we want
+	call	.dm_settag		; set tag=H for slot=L
+
+	; restore the proper RAM bank 
+	ld	a,(gpio_out_cache)
+	out     (gpio_out),a
+
+	ret
+endif
+
+
+;************************************************************************
+; Fill a cache slot by reading the CP/M track number in HL into the 
+; appropriate slot.
+;
+; This assumes that it is running with a stack over 0x8000
+;
+; HL = CP/M track number 
+; return Z flag = 1 = OK
+;************************************************************************
+.cache_slot_fill:
+
+	push	hl			; save the track number for repeated use later 
+
+	call	.dm_trk2slt		; HL=slot number
+	call	.dm_slt2trk		; HL=track number currently in the target slot
+
+	; Note: The cache slot's track number will be 0xffff if the slot is empty. 
+	; Track 0xffff is impossible when CP/M tracks have more than one sector in them.
+
+	pop	de			; DE = the CP/M track number we want
+        or	a			; clear the CY flag
+        sbc     hl,de                   ; HL = got - want
+
+if .rw_debug >= 2
+	jr	nz,.dbg_csm		; if we have a cache-miss then don't print here
+	push	af			; save the flags so can decide to return below
+	call	iputs
+	db	".cache_slot_fill cache hit: \0"
+	call	bios_debug_disk
+	pop	af
+.dbg_csm:
+endif
+
+	ret	z			; if HL==DE then return w/Z=1 now
+
+
+if .rw_debug >= 2
+	call	iputs
+	db	".cache_slot_fill cache miss: \0"
+	call	bios_debug_disk
+endif
+
+	push	de			; put a copy of the CP/M track we want back onto the stack
+
+	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
+	ld	h,d
+	ld	l,e
+	call	.dm_trk2slt
+	call	.dm_slt2bnk
+	ld	d,a			; D = bank number in high 4-bits
+
+	; select the RAM bank with the target cache slot in it
+	ld      a,(gpio_out_cache)	; get current value of the GPIO port
+	ld	(.save_gpio_out),a	; save the current gpio port value so can restore later
+	and	(~gpio_out_lobank)&0x0ff	; zero the RAM bank bits
+	or	d			; set the bank to that with the desired slot
+	ld	(gpio_out_cache),a	; save it so that the SD/SPI logic uses the right value
+	out     (gpio_out),a		; select the cache tag bank
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.cache_slot_fill slot bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	; calculate the slot address within the selected bank
+	pop	hl			; HL = the CP/M track number we want
+	push	hl
+	call	.dm_trk2slt
+	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
+	ld	d,h
+	ld	e,l			; DE = HL = target slot buffer address
+
+	; Calculate the SD physical block number that we want to read
+	pop	hl
+	push	hl
+	ld	bc,.sd_partition_base	; XXX Add the starting partition block number
+	add	hl,bc			; HL = SD physical block number
+
+	; Push the 32-bit physical SD block number into the stack in little-endian order
+	ld	bc,0
+	push	bc			; 32-bit SD block number (big end)
+	push	hl			; 32-bit SD block number (little end)
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.cache_slot_fill slot addr=\0'
+	ld	a,h
+	call	hexdump_a
+	ld	a,l
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	call	sd_cmd17		; read the SD block
+
+	pop	hl			; clean the 4-byte SD block number from the stack
+	pop	bc
+
+	or	a
+	jr	z,.cache_fill_ok
+
+	; Mark the slot as invalid because the read has failed
+	pop	hl			; HL = the CP/M track number we want
+	call	.dm_trk2slt		; overkill, but proper
+	ld	h,.cache_tag_inval	; mark the slot as invalid
+	call	.dm_settag
+
+	ld	a,(.save_gpio_out)
+	ld	(gpio_out_cache),a	
+	out     (gpio_out),a
+
+if .rw_debug >= 3
+	push	af			; save the GPIO latch value
+	call	iputs
+	db	'.cache_slot_fill SD read block failed.  restore bank=\0'
+	pop	af			; restore the GPIO latch value
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	or	1			; Z = 0 = error
+	ret
+
+
+.cache_fill_ok:
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.cache_slot_fill update tag=\0'
+	pop	hl			; HL = the CP/M track number we want
+	push	hl
+	ld	a,h
+	call	hexdump_a
+	call	iputs
+	db	', for slot=\0'
+	ld	a,l
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	; Update the cache tag for the slot that we just replaced
+	pop	hl			; HL = the CP/M track number we want
+	call	.dm_settag		; set tag=H for slot=L
+
+	; restore the proper RAM bank 
+	ld	a,(.save_gpio_out)
+	ld	(gpio_out_cache),a	
+	out     (gpio_out),a
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.cache_slot_fill restore bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	xor	a			; Z = 1 = no errors
+	ret
+
+
+
+
+
+;************************************************************************
+; Flush a cache slot by writing the CP/M track number in HL out
+; to disk.
+;
+; This assumes that it is running with a stack over 0x8000
+;
+; HL = CP/M track number 
+; return Z flag = 1 = OK
+;************************************************************************
+.cache_slot_flush:
+
+	; XXX this does not work!!!
+
+	push	hl			; save the track number for repeated use later 
+
+	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
+	call	.dm_trk2slt
+	call	.dm_slt2bnk
+	ld	d,a			; D = bank number in high 4-bits
+
+	; select the RAM bank with the target cache slot in it
+	ld      a,(gpio_out_cache)	; get current value of the GPIO port
+	ld	(.save_gpio_out),a	; save the current gpio port value so can restore later
+	and	(~gpio_out_lobank)&0x0ff	; zero the RAM bank bits
+	or	d			; set the bank to that with the desired slot
+	ld	(gpio_out_cache),a	; save it so that the SD/SPI logic uses the right value
+	out     (gpio_out),a		; select the cache tag bank
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.cache_slot_flush slot bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	; calculate the slot address within the selected bank
+	pop	hl			; HL = the CP/M track number we want
+	push	hl
+	call	.dm_trk2slt
+	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
+	ld	d,h
+	ld	e,l			; DE = HL = source slot buffer address
+
+	; write the cache slot contents to the SD card
+	pop	hl			; HL=CP/M track number
+	push	hl
+	ld	bc,.sd_partition_base	; XXX add the starting partition block number
+	add	hl,bc			; HL = SD physical block number
+	ld	bc,0
+	push	bc			; SD block number to write
+	push	hl
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.cache_slot_flush slot addr=\0'
+	ld	a,h
+	call	hexdump_a
+	ld	a,l
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	call	sd_cmd24		; write the SD block
+	pop	hl			; clean the SD block number from the stack
+	pop	bc
+
+	or	a
+	jr	z,.slot_flush_ret
+
+	call	iputs
+	db	".cache_slot_flush SD CARD WRITE FAILED!\r\n\0"
+
+	pop	hl			; HL = the CP/M track number we want
+if 0 ;XXX the cache slot is not really invalid if the write fails here
+	; Mark the slot as invalid because the write has failed
+	call	.dm_trk2slt		; overkill, but proper
+	ld	h,.cache_tag_inval	; mark the slot as invalid
+	call	.dm_settag
+endif
+
+	ld	a,1			; the write has failed
+
+.slot_flush_ret:
+	push	af
+	ld	a,(.save_gpio_out)
+	ld	(gpio_out_cache),a	
+	out     (gpio_out),a
+
+if .rw_debug >= 3
+	push	af			; save the GPIO latch value
+	call	iputs
+	db	'.cache_slot_flush restore bank=\0'
+	pop	af			; restore the GPIO latch value
+	call	hexdump_a
+	call	puts_crlf
+endif
+	pop	af
+	ret
+
+
+
+;************************************************************************
+; Copy the CP/M sector data from cache into the RAM.
+;
+; bios_disk_sector = sector in the cache to read from
+; bios_disk_track = track in the cache to read from
+; bios_disk_dma = where to copy the data into
+;
+; This assumes that it is running with a stack above 0x8000
+;
+; Clobbers everything
+;************************************************************************
+.copy_cache2ram:
+
+	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
+	ld	hl,(bios_disk_track)
+	call	.dm_trk2slt
+	call	.dm_slt2bnk
+	ld	d,a				; D = bank number in high 4-bits
+
+	; select the RAM bank with the target cache slot in it
+	ld      a,(gpio_out_cache)		; get current value of the GPIO port
+	ld	(.save_gpio_out),a		; save the current gpio port value so can restore later
+	and	(~gpio_out_lobank)&0x0ff	; zero the RAM bank bits
+	or	d				; set the bank to that with the desired slot
+	ld	(gpio_out_cache),a		; save it so that the SD/SPI logic uses the right value
+	out     (gpio_out),a			; select the cache tag bank
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.copy_cache2ram slot bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	ld	hl,(bios_disk_track)
+	ld	bc,(bios_disk_sector)
+	call	.dm_trksec2addr			; HL = @ of cpm sector in the cache
+
+	; Copy the CP/M sector data from the cache slot
+	ld	de,(bios_disk_dma)		; DE = CP/M target buffer address
+	ld	a,0x7f				; is DE > 0x7fff ?
+	cp	d
+	jp	m,.copy_cache2ramd		; yes? then OK
+
+	; we need to use a bounce buffer
+	ld	de,.dm_bounce_buffer
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.copy_cache2ram bounce dest=\0'
+	ld	a,d
+	call	hexdump_a
+	ld	a,e
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	ld	bc,0x0080			; number of bytes to copy
+	ldir
+
+	; restore the original RAM bank
+	ld	a,(.save_gpio_out)
+	ld	(gpio_out_cache),a	
+	out     (gpio_out),a
+
+	ld	hl,.dm_bounce_buffer
+	ld	de,(bios_disk_dma)
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.copy_cache2ram bounce src=\0'
+	ld	a,h
+	call	hexdump_a
+	ld	a,l
+	call	hexdump_a
+endif
+
+.copy_cache2ramd:
+
+if .rw_debug >= 3
+	call	iputs
+	db	', dest=\0'
+	ld	a,d
+	call	hexdump_a
+	ld	a,e
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	ld	bc,0x0080			; number of bytes to copy
+	ldir
+
+	; restore the proper RAM bank (redundant but OK if used a bounce buffer)
+	ld	a,(.save_gpio_out)
+	ld	(gpio_out_cache),a	
+	out     (gpio_out),a
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.copy_cache2ram restore bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	ret
+
+
+
+
+
+
+;************************************************************************
+; Copy the CP/M sector data from RAM into the cache.
+;
+; bios_disk_sector = sector in the cache to write into
+; bios_disk_track = track in the cache to write into
+; bios_disk_dma = where to copy the data from
+;
+; This assumes that it is running with a stack above 0x8000
+;
+; Clobbers everything
+;************************************************************************
+.copy_ram2cache:
+
+	ld	hl,(bios_disk_dma)		; HL = CP/M target buffer address
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.copy_ram2cache sector src addr=\0'
+	ld	a,h
+	call	hexdump_a
+	ld	a,l
+	call	hexdump_a
+endif
+
+	; Do we need to use a bounce buffer?
+	ld	a,0x7f				; is HL > 0x7fff ?
+	cp	h
+	jp	m,.copy_ram2cached		; yes? then OK
+
+	; Need to copy the sector into the bounce buffer
+	ld	de,.dm_bounce_buffer
+
+if .rw_debug >= 3
+	call	iputs
+	db	', bounce dest=\0'
+	ld	a,d
+	call	hexdump_a
+	ld	a,e
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	ld	bc,0x80
+	ldir
+	ld	hl,.dm_bounce_buffer
+
+if .rw_debug >= 3
+	call	iputs
+	db	'.copy_ram2cache bounce src=\0'
+	ld	a,h
+	call	hexdump_a
+	ld	a,l
+	call	hexdump_a
+endif
+
+.copy_ram2cached:
+	; source address = HL
+	push	hl				; save for later
+
+	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
+	ld	hl,(bios_disk_track)
+	call	.dm_trk2slt
+	call	.dm_slt2bnk
+	ld	d,a				; D = bank number in high 4-bits
+
+	; select the RAM bank with the target cache slot in it
+	ld      a,(gpio_out_cache)		; get current value of the GPIO port
+	ld	(.save_gpio_out),a		; save the current gpio port value so can restore later
+	and	(~gpio_out_lobank)&0x0ff	; zero the RAM bank bits
+	or	d				; set the bank to that with the desired slot
+	ld	(gpio_out_cache),a		; save it so that the SD/SPI logic uses the right value
+	out     (gpio_out),a			; select the cache tag bank
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	', dest slot bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+	ld	hl,(bios_disk_track)
+	ld	bc,(bios_disk_sector)
+	call	.dm_trksec2addr			; HL = @ of cpm sector in the cache
+
+	ld	d,h
+	ld	e,l				; DE = @ of target in the cache
+	pop	hl				; HL = @ of source data
+	ld	bc,0x0080			; number of bytes to copy
+	ldir
+
+	; restore the original RAM bank
+	ld	a,(.save_gpio_out)
+	ld	(gpio_out_cache),a	
+	out     (gpio_out),a
+
+if .rw_debug >= 3
+	push	af
+	call	iputs
+	db	'.copy_ram2cache restore bank=\0'
+	pop	af
+	call	hexdump_a
+	call	puts_crlf
+endif
+
+	ret
+
+
+
+
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p19:
@@ -370,8 +966,6 @@ if .rw_debug >= 1
 	ld	a,l
 	call	hexdump_a
 
-
-
 	call	iputs
 	db	', hit=\0'
 
@@ -400,14 +994,9 @@ if .rw_debug >= 1
 
 	ld	a,h
 	call	hexdump_a
-
-
-
 	call	iputs
 	db	')\0'
-
 	call	puts_crlf
-
 endif
 
 
@@ -423,232 +1012,16 @@ endif
 	push	bc			; save the register pairs we will otherwise clobber
 	push	de			; this is not critical but may make WBOOT cleaner later
 
+	ld	hl,(bios_disk_track)	; HL = CP/M track number to read
+	call	.cache_slot_fill
+	jr	nz,.bios_read_err
 
-	; select the proper RAM bank for the given slot
-	ld      hl,(bios_disk_track)
-	call	.dm_trk2slt
-	call	.dm_slt2bnk
-	ld	d,a			; D = bank number in high 4-bits
-
-	; Is the target track number in the cache? 
-
-	ld      hl,(bios_disk_track)
-	call	.dm_trk2slt		; HL=slot number
-	call	.dm_slt2trk		; HL=track number currently in the target slot
-
-	; select the RAM bank with the target cache slot in it
-	ld      a,(gpio_out_cache)	; get current value of the GPIO port
-	ld	(.save_gpio_out),a	; save the current gpio port value so can restore later
-	and	(~gpio_out_lobank)&0x0ff	; zero the RAM bank bits
-	or	d			; set the bank to that with the desired slot
-	ld	(gpio_out_cache),a	; save it so that the SD/SPI logic uses the right value
-	out     (gpio_out),a		; select the cache tag bank
-
-if .rw_debug >= 3
-	push	af
-	call	iputs
-	db	'cache slot bank=\0'
-	pop	af
-	call	hexdump_a
-	call	puts_crlf
-endif
-
-
-	; Note: The cache slot's track number will be 0xffff if the slot is empty. 
-	; Track 0xffff is impossible when CP/M tracks have more than one sector in them.
-
-	ld      de,(bios_disk_track)	; DE = the CP/M track number we want
-        or	a			; clear the CY flag
-        sbc     hl,de                   ; HL = got - want
-        jp      z,.read_cache_hit	; if equal then is in the cache
-
-	; The track in the slot is /not/ what we want.  Read it from the SD card 
-	; (possibly discarding/replacing a track that is currently in the slot.)
-
-if .rw_debug >= 2
-	call	iputs
-	db	"bios_read cache miss: \0"
-	call	bios_debug_disk
-endif
-
-	; Calculate the SD physical block number that we want to read
-	ld	hl,(bios_disk_track)
-	ld	de,.sd_partition_base	; XXX Add the starting partition block number
-	add	hl,de			; HL = SD physical block number
-
-	; Push the 32-bit physical SD block number into the stack in little-endian order
-	ld	de,0
-	push	de			; 32-bit SD block number (big end)
-	push	hl			; 32-bit SD block number (little end)
-
-	; calculate the slot address within the selected bank
-	ld	hl,(bios_disk_track)
-	call	.dm_trk2slt
-	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
-	ld	d,h
-	ld	e,l			; DE = HL
-
-if .rw_debug >= 3
-	call	iputs
-	db	'cache slot addr=\0'
-	ld	a,h
-	call	hexdump_a
-	ld	a,l
-	call	hexdump_a
-	call	puts_crlf
-endif
-
-	call	sd_cmd17		; read the SD block
-
-	pop	hl			; clean the 4-byte SD block number from the stack
-	pop	de
-
-	or	a			; was the SD driver read OK?
-	jr	z,.bios_read_sd_ok
-
-
-	call	iputs
-	db	"BIOS_READ FAILED!\r\n\0"
-
-	; Mark the slot as invalid in case the read fails
-	ld	hl,(bios_disk_track)
-	call	.dm_trk2slt		; overkill, but proper
-	ld	h,.cache_tag_inval	; mark the slot as invalid
-	call	.dm_settag
-
-	ld	a,1			; tell CP/M the read failed
-	jp	.bios_read_ret
-
-
-.bios_read_sd_ok:
-	; Update the cache tag for the slot that we just replaced
-	ld	hl,(bios_disk_track)
-	call	.dm_settag		; set tag=H for slot=L
-
-if .rw_debug >= 3
-	call	iputs
-	db	'update tag=\0'
-	ld	a,(bios_disk_track+1)
-	call	hexdump_a
-	call	iputs
-	db	', for slot=\0'
-	ld	a,(bios_disk_track)
-	call	hexdump_a
-	call	puts_crlf
-	
-endif
-
-.read_cache_hit:
-	ld	hl,(bios_disk_track)
-	call	.dm_trk2slt
-	call	.dm_slt2adr
-	ld	d,h
-	ld	e,l			; DE = target slot buffer address of the track
-
-	; calculate the CP/M sector offset address (bios_disk_sector*128)
-	ld	hl,(bios_disk_sector)	; must be 0..3
-	add	hl,hl			; HL *= 2
-	add	hl,hl			; HL *= 4
-	add	hl,hl			; HL *= 8
-	add	hl,hl			; HL *= 16
-	add	hl,hl			; HL *= 32
-	add	hl,hl			; HL *= 64
-	add	hl,hl			; HL *= 128
-
-	; calculate the address of the CP/M sector in the .bios_sdbuf
-	add	hl,de			; HL = @ of cpm sector in the cache
-
-if .rw_debug >= 3
-	call	iputs
-	db	'RAM bank=\0'
-	ld	a,(gpio_out_cache)
-	call	hexdump_a
-	call	iputs
-	db	', sector src addr=\0'
-	ld	a,h
-	call	hexdump_a
-	ld	a,l
-	call	hexdump_a
-endif
-
-	; copy the CP/M sector data from the cache slot
-	ld	de,(bios_disk_dma)		; DE = CP/M target buffer address
-	ld	a,0x7f				; is DE > 0x7fff ?
-	cp	d
-	jp	m,.bios_read_direct		; yes? then OK
-
-	; we need to use a bounce buffer
-	ld	de,.dm_bounce_buffer
-
-if .rw_debug >= 3
-	call	iputs
-	db	', bounce dest=\0'
-	ld	a,d
-	call	hexdump_a
-	ld	a,e
-	call	hexdump_a
-	call	puts_crlf
-endif
-
-	ld	bc,0x0080		; number of bytes to copy
-	ldir
-
-
-	; restore the original RAM bank
-	ld	a,(.save_gpio_out)
-	ld	(gpio_out_cache),a	
-	out     (gpio_out),a
-
-	ld	hl,.dm_bounce_buffer
-	ld	de,(bios_disk_dma)
-
-if .rw_debug >= 3
-	call	iputs
-	db	'bounce src=\0'
-	ld	a,h
-	call	hexdump_a
-	ld	a,l
-	call	hexdump_a
-endif
-
-.bios_read_direct:
-
-if .rw_debug >= 3
-	call	iputs
-	db	', dest=\0'
-	ld	a,d
-	call	hexdump_a
-	ld	a,e
-	call	hexdump_a
-	call	puts_crlf
-endif
-
-	ld	bc,0x0080		; number of bytes to copy
-	ldir
-
-	xor	a			; A = 0 = read OK
+	call	.copy_cache2ram  
+	xor	a			; tell CP/M the read succeeded
 
 .bios_read_ret:
-	; restore the proper RAM bank (redundant but OK if used a bounce buffer)
-	push	af
-	ld	a,(.save_gpio_out)
-	ld	(gpio_out_cache),a	
-	out     (gpio_out),a
-
-if .rw_debug >= 3
-	push	af
-	call	iputs
-	db	'restore bank=\0'
-	pop	af
-	call	hexdump_a
-	call	puts_crlf
-endif
-
-	pop	af
-
 	pop	de			; restore saved regs
 	pop	bc
-
 
 	; Restore the caller's stack
 	pop	hl			; HL = original saved stack pointer
@@ -656,6 +1029,14 @@ endif
 	pop	hl			; restore the original  HL value
 
 	ret
+
+.bios_read_err:
+	call	iputs
+	db	"BIOS_READ FAILED!\r\n\0"
+
+	ld	a,1			; tell CP/M the read failed
+	jp	.bios_read_ret
+
 
 ;##########################################################################
 ;
@@ -700,15 +1081,12 @@ if .rw_debug >= 1
 	pop	bc
 endif
 
-
-	; XXX stub in for testing
+if 1
+	; XXX guard against those that do not read the doc!
 	ld	a,1
-	ret			; 100% error!
+	ret
+endif
 
-
-
-
-if 0
 
 	; switch to a local stack (we only have a few levels when called from the BDOS!)
 	push	hl			; save HL into the caller's stack
@@ -717,119 +1095,40 @@ if 0
 	ld	sp,bios_stack		; SP = temporary private BIOS stack area
 	push	hl			; save the old SP value in the BIOS stack
 
-	push	de			; save the register pairs we will otherwise clobber
-	push	bc
+	push	bc			; save the register pairs we will otherwise clobber
+	push	de			; this is not critical but may make WBOOT cleaner later
 
-	ld	hl,(bios_disk_track)	; HL = CP/M track number
-
-	; Check to see if the SD block in .bios_sdbuf is already the one we want
-	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
-	or	a			; is it a non-zero value?
-	jr	nz,.bios_write_miss	; block buffer is invalid, pre-read the SD block
-
-	ld	a,(.bios_sdbuf_trk)	; A = CP/M track LSB
-	cp	l			; is it the one we want?
-	jr	nz,.bios_write_miss	; LSB does not match, pre-read the SD block
-
-	ld	a,(.bios_sdbuf_trk+1)	; A = CP/M track MSB
-	cp	h			; is it the one we want?
-	jp	z,.bios_write_sdbuf	; The SD block in .bios_sdbuf is the one we want!
-
-.bios_write_miss:
-if .rw_debug >= 1
-	call	iputs
-	db	"bios_write cache miss: \0"
-	call	bios_debug_disk
-endif
-
-	; Assume all will go well reading the SD card block.
-	; We only need to touch this if we are going to actually read the SD card.
-	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
-	xor	a			; A = 0
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
-
-
+if 0
+	;XXX This logic is ONLY legal is a track size is <= CP/M allocation block size
 	; if C==2 then we are writing into an alloc block (and therefore an SD block) that is not dirty
-	pop	bc			; restore C in case was clobbered above
-	push	bc
 	ld	a,2
 	cp	c
-	jr	nz,.bios_write_prerd
+	jr	nz,.bios_write_prerd	; if C!=2 then read the sector
 
-	; padd the SD buffer with all 0xe5
-	ld	hl,.bios_sdbuf		; buffer to initialize
-	ld	de,.bios_sdbuf+1	; buffer+1
-	ld	bc,0x1ff		; number of bytes to initialize
-	ld	(hl),0xe5		; set the first byte to 0xe5
-	ldir				; set the rest of the bytes to 0xe5
-	jp	.bios_write_sdbuf	; go to write logic (skip the SD card pre-read)
+	; C==2, no need to read the SD.  Just padd it with 0xe5.
+	ld	hl,(bios_disk_track)	; track to padd
+	call	.cache_slot_padd
+	jp	.bios_write_slot	; go to write logic (skip the SD card pre-read)
+endif
 
-.bios_write_prerd:
-	; pre-read the block so we can replace one sector and write it back
-	; XXX This is a hack that won't work unless the disk partition < 0x10000
-	; XXX This has the SD card partition offset hardcoded in it!!!
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
+	ld	hl,(bios_disk_track)	; HL = CP/M track number to read
+	call	.cache_slot_fill
+	jr	z,.bios_write_slot	; If .cache_slot_fill is OK then continue
 
-	; push the 32-bit physical SD block number into the stack in little-endian order
-	ld	de,0
-	push	de			; 32-bit SD block number (big end)
-	push	hl			; 32-bit SD block number (little end)
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
-	call	sd_cmd17		; pre-read the SD block
-	pop	hl			; clean the SD block number from the stack
-	pop	de
-
-	or	a			; was the SD driver read OK?
-	jr	z,.bios_write_sdbuf
-
+.bios_write_err:
+	; XXX Should we invalidate the cache slot here????
 	call	iputs
-	db	"BIOS_WRITE SD CARD PRE-READ FAILED!\r\n\0"
-	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
+	db	"BIOS_WRITE SD CARD PRE-READ FAILED!\r\n\0"	; XXX this message is not always proper
+	ld	a,1			; tell CP/M the write failed
 	jp	.bios_write_ret
 
-.bios_write_sdbuf:
-	; calculate the CP/M sector offset address (bios_disk_sector*128)
-	ld	hl,(bios_disk_sector)	; must be 0..3
-	add	hl,hl			; HL *= 2
-	add	hl,hl			; HL *= 4
-	add	hl,hl			; HL *= 8
-	add	hl,hl			; HL *= 16
-	add	hl,hl			; HL *= 32
-	add	hl,hl			; HL *= 64
-	add	hl,hl			; HL *= 128
+.bios_write_slot:
+	call	.copy_ram2cache		; copy the write-data into the cache
 
-	; calculate the address of the CP/M sector in the .bios_sdbuf
-	ld	bc,.bios_sdbuf
-	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
-	ld	d,h
-	ld	e,l			; DE = @ of cpm sector in the .bios_sdbuf
-
-	; copy the data of interest /into/ the SD block
-	ld	hl,(bios_disk_dma)		; source address
-	ld	bc,0x0080		; number of bytes to copy
-	ldir
-
-	; write the .bios_sdbuf contents to the SD card
-	ld      hl,(bios_disk_track)
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
-	ld	de,0
-	push	de			; SD block number to write
-	push	hl
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
-	call	sd_cmd24		; write the SD block
-	pop	hl			; clean the SD block number from the stack
-	pop	de
-
-	or	a
-	jr	z,.bios_write_ret
-
-	call	iputs
-	db	"BIOS_WRITE SD CARD WRITE FAILED!\r\n\0"
-	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
+	ld	hl,(bios_disk_track)	; HL = CP/M track number to write
+	call	.cache_slot_flush	; flush the cache slot to disk
+	jr	nz,.bios_write_err	; If .cache_slot_flush failed, then retrun error 
+	xor	a			; tell CP/M the write was OK
 
 .bios_write_ret:
 	pop	bc
@@ -840,8 +1139,6 @@ endif
 	pop	hl			; restore the original  HL value
 
 	ret
-
-endif
 
 
 ;##########################################################################
