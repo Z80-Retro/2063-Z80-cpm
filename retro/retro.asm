@@ -57,6 +57,7 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
+;.debug:		equ	1
 .debug:		equ	0
 
 
@@ -581,8 +582,8 @@ endif
 ; Pick the preferred flavor of SD read/write routines.
 
 ;include 'rw_stub.asm'
-include 'rw_nocache.asm'
-;include 'rw_dmcache.asm'
+;include 'rw_nocache.asm'
+include 'rw_dmcache.asm'
 
 
 
