@@ -94,8 +94,8 @@
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-.rw_debug:		equ	3
-;.rw_debug:		equ	0
+;.rw_debug:		equ	3
+.rw_debug:		equ	0
 
 .cache_tag_bank: 	equ	0xd0	; defined in terms of the GPIO port bits 
 ;.cache_tag_base:	equ	0	; the first tag table entry MUST be at 0x0000!
@@ -319,6 +319,7 @@ if .rw_debug >= 3
 	call	hexdump_a
 	ld	a,l
 	call	hexdump_a
+	call	puts_crlf
 endif
 	ret
 
@@ -471,9 +472,9 @@ endif
 if .rw_debug >= 3
 	call	iputs
 	db	'.cache_slot_fill slot addr=\0'
-	ld	a,h
+	ld	a,d
 	call	hexdump_a
-	ld	a,l
+	ld	a,e
 	call	hexdump_a
 	call	puts_crlf
 endif
@@ -561,8 +562,6 @@ endif
 ;************************************************************************
 .cache_slot_flush:
 
-	; XXX this does not work!!!
-
 	push	hl			; save the track number for repeated use later 
 
 	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
@@ -597,7 +596,7 @@ endif
 
 	; write the cache slot contents to the SD card
 	pop	hl			; HL=CP/M track number
-	push	hl
+
 	ld	bc,.sd_partition_base	; XXX add the starting partition block number
 	add	hl,bc			; HL = SD physical block number
 	ld	bc,0
@@ -607,9 +606,9 @@ endif
 if .rw_debug >= 3
 	call	iputs
 	db	'.cache_slot_flush slot addr=\0'
-	ld	a,h
+	ld	a,d
 	call	hexdump_a
-	ld	a,l
+	ld	a,e
 	call	hexdump_a
 	call	puts_crlf
 endif
@@ -619,20 +618,12 @@ endif
 	pop	bc
 
 	or	a
-	jr	z,.slot_flush_ret
+	jr	z,.slot_flush_ret	; write operation succeeded Z=1
 
 	call	iputs
 	db	".cache_slot_flush SD CARD WRITE FAILED!\r\n\0"
 
-	pop	hl			; HL = the CP/M track number we want
-if 0 ;XXX the cache slot is not really invalid if the write fails here
-	; Mark the slot as invalid because the write has failed
-	call	.dm_trk2slt		; overkill, but proper
-	ld	h,.cache_tag_inval	; mark the slot as invalid
-	call	.dm_settag
-endif
-
-	ld	a,1			; the write has failed
+	or	1			; the write has failed Z=0
 
 .slot_flush_ret:
 	push	af
@@ -785,7 +776,7 @@ endif
 
 if .rw_debug >= 3
 	call	iputs
-	db	'.copy_ram2cache sector src addr=\0'
+	db	'.copy_ram2cache sector src dma addr=\0'
 	ld	a,h
 	call	hexdump_a
 	ld	a,l
@@ -793,9 +784,9 @@ if .rw_debug >= 3
 endif
 
 	; Do we need to use a bounce buffer?
-	ld	a,0x7f				; is HL > 0x7fff ?
-	cp	h
-	jp	m,.copy_ram2cached		; yes? then OK
+	ld	a,0x7f				
+	cp	h				; is HL > 0x7fff ?
+	jp	m,.copy_ram2cached		; if HL > 0x7fff then no bounce
 
 	; Need to copy the sector into the bounce buffer
 	ld	de,.dm_bounce_buffer
@@ -1081,13 +1072,6 @@ if .rw_debug >= 1
 	pop	bc
 endif
 
-if 1
-	; XXX guard against those that do not read the doc!
-	ld	a,1
-	ret
-endif
-
-
 	; switch to a local stack (we only have a few levels when called from the BDOS!)
 	push	hl			; save HL into the caller's stack
 	ld	hl,0
@@ -1099,7 +1083,7 @@ endif
 	push	de			; this is not critical but may make WBOOT cleaner later
 
 if 0
-	;XXX This logic is ONLY legal is a track size is <= CP/M allocation block size
+	;XXX This logic is ONLY legal when a track size is <= CP/M allocation block size
 	; if C==2 then we are writing into an alloc block (and therefore an SD block) that is not dirty
 	ld	a,2
 	cp	c
@@ -1115,10 +1099,13 @@ endif
 	call	.cache_slot_fill
 	jr	z,.bios_write_slot	; If .cache_slot_fill is OK then continue
 
-.bios_write_err:
-	; XXX Should we invalidate the cache slot here????
 	call	iputs
-	db	"BIOS_WRITE SD CARD PRE-READ FAILED!\r\n\0"	; XXX this message is not always proper
+	db	"BIOS_WRITE SD CARD CACHE SLOT FILL FAILED!\r\n\0"
+	jp	.bios_write_err
+.slot_flush_err:
+	call	iputs
+	db	"BIOS_WRITE SD CARD CACHE SLOT FLUSH FAILED!\r\n\0"
+.bios_write_err:
 	ld	a,1			; tell CP/M the write failed
 	jp	.bios_write_ret
 
@@ -1127,7 +1114,7 @@ endif
 
 	ld	hl,(bios_disk_track)	; HL = CP/M track number to write
 	call	.cache_slot_flush	; flush the cache slot to disk
-	jr	nz,.bios_write_err	; If .cache_slot_flush failed, then retrun error 
+	jr	nz,.slot_flush_err	; If .cache_slot_flush failed then return error 
 	xor	a			; tell CP/M the write was OK
 
 .bios_write_ret:
@@ -1204,7 +1191,7 @@ rw_init:
 ;	value! 
 ;
 ;##########################################################################
-if 1
+if .rw_debug >= 3
 rw_debug_wedge:
 
 	; switch to a local stack since we need to change the RAM bank
