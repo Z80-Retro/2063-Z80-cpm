@@ -296,8 +296,7 @@ endif
 	push	bc
 	call	.dm_trk2slt
 	call	.dm_slt2adr
-	ld	d,h
-	ld	e,l			; DE = target slot buffer address of the track
+	ex	de,hl			; DE = target slot buffer address (HL = garbage)
 
 	; calculate the CP/M sector offset address (bios_disk_sector*128)
 	pop	hl			; HL=CP/M sector number, must be 0..3
@@ -455,8 +454,7 @@ endif
 	push	hl
 	call	.dm_trk2slt
 	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
-	ld	d,h
-	ld	e,l			; DE = HL = target slot buffer address
+	ex	de,hl			; DE = target slot buffer address (HL = garbage)
 
 	; Calculate the SD physical block number that we want to read
 	pop	hl
@@ -591,8 +589,7 @@ endif
 	push	hl
 	call	.dm_trk2slt
 	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
-	ld	d,h
-	ld	e,l			; DE = HL = source slot buffer address
+	ex	de,hl			; DE = slot buffer address (and HL = garbage)
 
 	; write the cache slot contents to the SD card
 	pop	hl			; HL=CP/M track number
@@ -844,8 +841,7 @@ endif
 	ld	bc,(bios_disk_sector)
 	call	.dm_trksec2addr			; HL = @ of cpm sector in the cache
 
-	ld	d,h
-	ld	e,l				; DE = @ of target in the cache
+	ex	de,hl				; DE = @ of target in the cache (and HL = garbage)
 	pop	hl				; HL = @ of source data
 	ld	bc,0x0080			; number of bytes to copy
 	ldir
@@ -961,8 +957,7 @@ if .rw_debug >= 1
 	db	', hit=\0'
 
 	; Does the slot have the track in it that we are looking for?
-	ld	d,h			; save the track number 
-	ld	e,l			;      that is currently in the slot
+	ex	de,hl			; DE = track number/slot (HL = garbage)
 	ld	hl,(bios_disk_track)
 	or	a			; clear the CY flag
 	sbc	hl,de			; HL = got - want
