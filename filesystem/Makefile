@@ -19,6 +19,16 @@ retro.img: ../retro/retro.bin ../cpm22/filesystem/* adventure/adv-B03
 	cpmcp -f z80-retro-2k-8m retro.img ../cpm22/filesystem/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img adventure/adv-B03/* 0:
 
+tms9118: retro.img
+	if [ `ls -1 progs/tms9118/*.com 2>/dev/null | wc -l` -gt 0 ]; then\
+		cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0: ; \
+	fi
+
+assemblers: retro.img
+	if [ `ls -1 assemblers/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
+		cpmcp -f z80-retro-2k-8m retro.img assemblers/*/* 0: ; \
+	fi
+
 local: retro.img
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
 		cpmcp -f z80-retro-2k-8m retro.img local/*/*/* 0: ; \
