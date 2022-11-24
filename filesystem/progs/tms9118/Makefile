@@ -4,7 +4,8 @@ PROGS=\
 	dram.com \
 	mode1.com \
 	mode2.com \
-	mode1i2.com
+	mode1i2.com \
+	mode1a.com
 
 
 all: $(PROGS)
