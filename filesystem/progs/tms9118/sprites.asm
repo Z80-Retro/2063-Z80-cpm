@@ -27,6 +27,20 @@
 .vdp_vram:	equ	0x80	; VDP port for accessing the VRAM
 .vdp_reg:	equ	0x81	; VDP port for accessing the registers
 
+.joy0:		equ	0xa8	; I/O port for joystick 0
+.joy1:		equ	0xa9	; I/O port for joystick 1
+
+joy_left:	equ	0x04		; and-mask for left
+joy_right:	equ	0x20		; and-mask for right
+joy_up:		equ	0x80		; and-mask for up
+joy_down:	equ	0x40		; and-mask for down
+joy_btn:	equ	0x01		; and-mask for button
+
+joy_horiz_min:	equ	0x00		; left of the screen
+joy_horiz_max:	equ	0x0100-16	; right of the screen - sprite width
+joy_vert_min:	equ	0x00		; top of the screen
+joy_vert_max:	equ	0x00c0-16	; bottom of the screen - sprite height
+
 	org	0x100
 
 	ld	sp,.stack
@@ -64,10 +78,10 @@
 	or	e
 	jp	nz,.vram_init_loop
 
-
 ; move the sprites around
 
-	ld	e,0
+	ld	d,0		; d = horizontal posn
+	ld	e,0		; e = vertical posn
 
 	; .spriteattr+0 = vertical posn 00..
 	; .spriteattr+1 = horizontal posn
@@ -78,7 +92,7 @@
 	ld	hl,.spriteattr
 	ld	(hl),e		; set vert posn
 	inc	hl
-	ld	(hl),e		; set horiz posn
+	ld	(hl),d		; set horiz posn
 
 	push	de		; save the sprite position  value
 
@@ -131,12 +145,52 @@ if 0
 	jp	nz,.sdelay
 endif
 
-	inc	e		; advance the position
-	ld	a,e
-	cp	0xc0
-	jp	nz,.spriteloop	; if e != 0xd0 then keep going
 
-	ld	e,0		; reset the posn (since vert posn 0xd0 is a terminator)  
+	; Read joystick for up/down and left/right direction
+
+	; XXX clamp the min/max values on the posn values
+
+	in	a,(.joy1)
+	and	joy_up
+	jr	nz,.not_up
+	ld	a,e
+	cp	joy_vert_min
+	jr	z,.not_up	; if at max value, don't increment it
+	dec	e		; dec vertical position
+	dec	e		; move faster
+.not_up:
+
+	in	a,(.joy1)
+	and	joy_down
+	jr	nz,.not_down
+	ld	a,e
+	cp	joy_vert_max
+	jr	z,.not_down	; if at max value, don't increment it
+	inc	e		; inc vertical position
+	inc	e
+.not_down:
+
+	in	a,(.joy1)
+	and	joy_left
+	jr	nz,.not_left
+	ld	a,d
+	cp	joy_horiz_min
+	jr	z,.not_left	; if at min value, don't decrement it
+	dec	d		; dec horizontal position
+	dec	d
+.not_left:
+
+	in	a,(.joy1)
+	and	joy_right
+	jr	nz,.not_right
+	ld	a,d
+	cp	joy_horiz_max
+	jr	z,.not_right	; if at max value, don't increment it
+	inc	d		; inc horizontal position
+	inc	d
+.not_right:
+
+	
 	jp	.spriteloop
 
 
