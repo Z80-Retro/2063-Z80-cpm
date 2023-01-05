@@ -5,7 +5,8 @@ PROGS=\
 	mode1.com \
 	mode2.com \
 	mode1i2.com \
-	mode1a.com
+	mode1a.com \
+	sprites.com
 
 
 all: $(PROGS)
