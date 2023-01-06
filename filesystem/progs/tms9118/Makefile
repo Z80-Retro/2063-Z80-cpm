@@ -6,6 +6,8 @@ PROGS=\
 	mode2.com \
 	mode1i2.com \
 	mode1a.com \
+	m1t1.com \
+	m1t2.com \
 	sprites.com
 
 
