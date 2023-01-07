@@ -172,7 +172,7 @@ joy_vert_speed:	equ	1
 	ld	hl,.nametable
 	ld	(hl),b			; store the direction heading
 	ld	de,.nametable+1
-	ld	bc,.nametable_len
+	ld	bc,.nametable_len-1
 	ldir				; copy the direction arrow to entire screen
 
 	; wait for the next vertical blanking period
@@ -200,8 +200,8 @@ joy_vert_speed:	equ	1
 ; Clobbers: AF
 ;**********************************************************************
 vdp_wait:
-	in	a,(.vdp_reg)
-	and	0x80
+	in	a,(.vdp_reg)		; read the VDP status register
+	and	0x80			; frame flag on?
 	jp	z,vdp_wait
 	ret
 
@@ -243,7 +243,7 @@ if 0
 	inc	d			; when e != 0, do otir one extra time
 
 .vdp_write_loop:
-	otir				; 2usec @ 10MHZ, from write to write (too fast)
+	otir				; 2.1usec @ 10MHZ, from write to write (too fast)
 
 	dec	d
 	jr	nz,.vdp_write_loop	; go back and do 0x100 more bytes
@@ -390,10 +390,10 @@ endif
 	ds	0x800,0x00				; 0x1800-0x1fff unused
 
 	; For the color table, provide assortment of random color pairs
-	db	0x21,0x31,0x41,0x51,0x61,0x71,0x81,0x91
-	db	0xa1,0xb1,0xc1,0xd1,0xe1,0xf1,0x12,0x32
-	db	0x42,0x52,0x62,0x72,0x82,0x92,0xa2,0xb2
-	db	0xc2,0xd2,0xe2,0xf2,0x13,0x23,0x43,0x53
+	db	0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x21
+	db	0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x21
+	db	0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x21
+	db	0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x21
 
 .vraminit_len:	equ	$-.vraminit
 
@@ -404,8 +404,8 @@ endif
 .mode1init:
 	db	0x00,0x80	; R0 = graphics mode, no EXT video
 ;	db	0xc0,0x81	; R1 = 16K RAM, enable display, disable INT, 8x8 sprites, mag off
-;	db	0xc1,0x81	; R1 = 16K RAM, enable display, disable INT, 16x16 sprites, mag off
-	db	0xe1,0x81	; R1 = 16K RAM, enable display, enable INT, 16x16 sprites, mag off
+;	db	0xc1,0x81	; R1 = 16K RAM, enable display, disable INT, 8x8 sprites, mag on
+	db	0xe1,0x81	; R1 = 16K RAM, enable display, enable INT, 8x8 sprites, mag on
 	db	0x05,0x82	; R2 = name table = 0x1400
 	db	0x80,0x83	; R3 = color table = 0x0200
 	db	0x01,0x84	; R4 = pattern table = 0x0800
