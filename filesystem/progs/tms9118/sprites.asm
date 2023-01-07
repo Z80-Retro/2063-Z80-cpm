@@ -1,6 +1,6 @@
 ;****************************************************************************
 ;
-;    VDP test app
+;    VDP Graphics Mode 1 With Sprites Test 
 ;
 ;    Copyright (C) 2021,2022,2023 John Winans
 ;
@@ -41,6 +41,9 @@ joy_horiz_max:	equ	0x0100-16	; right of the screen - sprite width
 joy_vert_min:	equ	0x00		; top of the screen
 joy_vert_max:	equ	0x00c0-16	; bottom of the screen - sprite height
 
+joy_horiz_speed: equ	3		; movement rate pixel rate/field 
+joy_vert_speed:	equ	1
+
 	org	0x100
 
 	ld	sp,.stack
@@ -67,21 +70,110 @@ joy_vert_max:	equ	0x00c0-16	; bottom of the screen - sprite height
 	; move the sprites around
 	;******************************************
 
-	ld	d,0			; d = horizontal posn
-	ld	e,0			; e = vertical posn
-
-	; .spriteattr+0 = vertical posn 00..
-	; .spriteattr+1 = horizontal posn
-	; .spriteattr+2 = pattern name
-	; .spriteattr+3 = early clock & color
+	; game variables are initialized in the .vram buffer
 
 .spriteloop:
-	ld	hl,.spriteattr
-	ld	(hl),e			; set vert posn from last joystick reading
-	inc	hl
-	ld	(hl),d			; set horiz posn from last joystick reading
 
-	push	de			; save the sprite position  value
+	; XXX check for a quit key to terminate the proggie here??
+
+	; Update the sprite position(s) and the display characters
+
+	ld	b,0x00			; B = direction mask: up=4, dn=1, rt=2, lt=8
+	ld	de,(.paddle0)		; D = x position, E = y position
+
+	in	a,(.joy1)		; Read joystick once so can't transition during processing
+	ld	c,a			; C = current joystick value
+
+	; up/down and left/right direction control logic
+
+	; move up?
+	ld	a,c
+	and	joy_up
+	jr	nz,.not_up
+
+	ld	a,b
+	or	0x04			; set the up bit in the direction character
+	ld	b,a
+
+	ld	a,e			; A = current Y position
+	ld	e,joy_vert_min		; assume we hit the limit
+	cp	joy_vert_min+joy_vert_speed
+	jp	c,.up_limit		; if borrow then we are at the limit
+	sub	joy_vert_speed		; move it up
+	ld	e,a
+.up_limit:
+.not_up:
+
+	; move down?
+	ld	a,c
+	and	joy_down
+	jr	nz,.not_down
+
+	ld	a,b
+	or	0x01			; set the down bit in the direction character
+	ld	b,a
+
+	ld	a,e			; A = current Y position
+	ld	e,joy_vert_max		; assume we hit the limit
+	cp	joy_vert_max-joy_vert_speed
+	jp	nc,.down_limit		; if at max value, don't increment it
+	add	joy_vert_speed
+	ld	e,a
+.down_limit:
+.not_down:
+
+	; move left?
+	ld	a,c
+	and	joy_left
+	jr	nz,.not_left
+
+	ld	a,b
+	or	0x08			; set the left bit in the direction character
+	ld	b,a
+
+	ld	a,d			; A = current X position
+	ld	d,joy_horiz_min		; assume we hit the limit 
+	cp	joy_horiz_min+joy_horiz_speed
+	jp	c,.left_limit		; if borrow then we are at the limit
+	sub	joy_horiz_speed		; move it up
+	ld	d,a
+.left_limit:
+.not_left:
+
+	; move right
+	ld	a,c
+	and	joy_right
+	jr	nz,.not_right
+
+	ld	a,b
+	or	0x02			;set the down bit in the direction character
+	ld	b,a
+
+	ld	a,d			; A = current X position
+	ld	d,joy_horiz_max		; assume we hit the limit
+	cp	joy_horiz_max-joy_horiz_speed
+	jp	nc,.right_limit		; if at max value, don't increment it
+	add	joy_horiz_speed
+	ld	d,a
+.right_limit:
+.not_right:
+
+	; XXX It is also probably a better idea not to bother doing this if nothing changed ;-)
+	;	...BUUUUT that would make it tougher to check timing on the scope.
+	;	...AAAAND the call to vdp_wait is how the game speed is governed.
+
+	ld	(.paddle0),de		; store sprite posn back into sprite attrib table
+
+	; update the character code representing the mouse direction
+	; XXX This would run faster if done custom while transferring data into the VDP name table.
+	; XXX The point of doing it this way is to analyze the efficency of 
+	;	doing full screen double-buffered updates.
+
+	ld	hl,.nametable
+	ld	(hl),b			; store the direction heading
+	ld	de,.nametable+1
+	ld	bc,.nametable_len
+	ldir				; copy the direction arrow to entire screen
 
 	; wait for the next vertical blanking period
 	call	vdp_wait
@@ -97,97 +189,6 @@ joy_vert_max:	equ	0x00c0-16	; bottom of the screen - sprite height
 	ld	bc,.nametable_len	; number of bytes to send
 	ld	de,0x1400		; VDP name table starts at 0x1400
 	call	vdp_write
-
-	pop	de
-
-
-	; XXX check for a quit key to terminate the proggie here??
-
-	; Update the sprite position(s) and the display characters
-
-	; use B to calculate the direction indicator  
-	ld	b,0x00			; up=4, dn=1, rt=2, lt=8
-
-
-	in	a,(.joy1)		; Read joystic once so can't transition during processing
-	ld	c,a			; C = joystick value
-
-	; up/down and left/right direction control logic
-
-	ld	a,c
-	and	joy_up
-	jr	nz,.not_up
-
-	ld	a,b
-	or	0x04			; set the up bit in the direction character
-	ld	b,a
-
-	ld	a,e
-	cp	joy_vert_min
-	jr	z,.not_up		; if at max value, don't increment it
-	dec	e			; dec vertical position
-	dec	e			; move faster
-.not_up:
-
-	ld	a,c
-	and	joy_down
-	jr	nz,.not_down
-
-	ld	a,b
-	or	0x01			; set the down bit in the direction character
-	ld	b,a
-
-	ld	a,e
-	cp	joy_vert_max
-	jr	z,.not_down		; if at max value, don't increment it
-	inc	e			; inc vertical position
-	inc	e
-.not_down:
-
-	ld	a,c
-	and	joy_left
-	jr	nz,.not_left
-
-	ld	a,b
-	or	0x08			; set the left bit in the direction character
-	ld	b,a
-
-	ld	a,d
-	cp	joy_horiz_min
-	jr	z,.not_left		; if at min value, don't decrement it
-	dec	d			; dec horizontal position
-	dec	d
-.not_left:
-
-	ld	a,c
-	and	joy_right
-	jr	nz,.not_right
-
-	ld	a,b
-	or	0x02			;set the down bit in the direction character
-	ld	b,a
-
-	ld	a,d
-	cp	joy_horiz_max
-	jr	z,.not_right		; if at max value, don't increment it
-	inc	d			; inc horizontal position
-	inc	d
-.not_right:
-
-
-	; update the character code representing the mouse direction
-	; XXX This would run faster if done custom while transferring data into the VDP name table.
-	; XXX The point of doing it this way is to analyze the efficency of 
-	;	doing full screen double-buffered updates.
-
-	push	de
-	ld	hl,.nametable
-	ld	(hl),b			; store the direction heading
-	ld	de,.nametable+1
-	ld	bc,.nametable_len
-	ldir
-	pop	de
-
 
 	jp	.spriteloop
 
@@ -339,7 +340,7 @@ vdp_write_slow:
 ; data sent to initialize the VRAM
 .vraminit:
 .spritepat:
-	;ds	0x800,0xf0	; 0x0000-0x07ff sprite patterns
+	; 0x0000-0x07ff sprite patterns (8x8 mode)
 	db	0x10,0x10,0xfe,0x7c,0x38,0x6c,0x44,0x00	; 0 = star
 	db	0x3c,0x7e,0xff,0xff,0xff,0xff,0x7e,0x3c	; 1 = ball
 	db	0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x00	; 2 = horizontal paddle
@@ -347,7 +348,7 @@ vdp_write_slow:
 	ds      0x800-($-.spritepat),0xf0       	; padd the rest of the sprite pattern table
 
 .patterns:
-	;ds	0x800,0x10	; 0x0800-0x0fff pattern table = 00010000   (vertical stripes)
+	; 0x0800-0x0fff pattern table
 	db	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00	; 0 = blank 
 	db	0x00,0x00,0x00,0x00,0x00,0x7e,0x3c,0x18	; 1 = down arrowhead
 	db	0x00,0x04,0x06,0x07,0x07,0x06,0x04,0x00	; 2 = right arrowhead
@@ -363,11 +364,17 @@ vdp_write_slow:
 	db	0xf8,0xf0,0xe0,0xc0,0x80,0x00,0x00,0x00	; C = 2nd quandrant arrowhead
 	ds      0x800-($-.patterns),0x66       		; padd the rest of the pattern table
 
-
 .spriteattr:
 	; 0x1000-0x107f sprite attributes
-	db	0x70,0x70,0x02,0x08			; sprite 0
-	ds	0x07c,0xd0				; sprites 1..31 (0xd0 = no such sprite and higher numbered ones are ignored)
+	; sprite zero is paddle zero:
+.paddle0:
+	db	24*8/2-16/2	; vertical position.   0=top (center it)
+	db	32*8/2-16/2	; horizontal position. 0=left (center it)
+	db	0x02		; pattern name number
+	db	0x08		; early clock & color
+
+	ds      0x080-($-.spriteattr),0xd0     		; padd the rest (0xd0 = no such sprite)
+
 .spriteattr_len:	equ	$-.spriteattr		; how many bytes are in the sprite attrib table
 
 	ds	0x380,0x00				; 0x1080-0x13ff unused
@@ -391,25 +398,21 @@ endif
 .vraminit_len:	equ	$-.vraminit
 
 
-
-
-
 ;**********************************************************************
 ; VDP register initialization values
 ;**********************************************************************
 .mode1init:
-	db	0x00,0x80		; R0 = graphics mode, no EXT video
-;	db	0xc0,0x81		; R1 = 16K RAM, enable display, disable INT, 8x8 sprites, mag off
-;	db	0xc1,0x81		; R1 = 16K RAM, enable display, disable INT, 16x16 sprites, mag off
-	db	0xe1,0x81		; R1 = 16K RAM, enable display, enable INT, 16x16 sprites, mag off
-	db	0x05,0x82		; R2 = name table = 0x1400
-	db	0x80,0x83		; R3 = color table = 0x0200
-	db	0x01,0x84		; R4 = pattern table = 0x0800
-	db	0x20,0x85		; R5 = sprite attribute table = 0x1000
-	db	0x00,0x86		; R6 = sprite pattern table = 0x0000
-	db	0xf1,0x87		; R7 = fg=white, bg=black
+	db	0x00,0x80	; R0 = graphics mode, no EXT video
+;	db	0xc0,0x81	; R1 = 16K RAM, enable display, disable INT, 8x8 sprites, mag off
+;	db	0xc1,0x81	; R1 = 16K RAM, enable display, disable INT, 16x16 sprites, mag off
+	db	0xe1,0x81	; R1 = 16K RAM, enable display, enable INT, 16x16 sprites, mag off
+	db	0x05,0x82	; R2 = name table = 0x1400
+	db	0x80,0x83	; R3 = color table = 0x0200
+	db	0x01,0x84	; R4 = pattern table = 0x0800
+	db	0x20,0x85	; R5 = sprite attribute table = 0x1000
+	db	0x00,0x86	; R6 = sprite pattern table = 0x0000
+	db	0xf1,0x87	; R7 = fg=white, bg=black
 .mode1init_len: equ	$-.mode1init	; number of bytes to write
-
 
 	ds	1024
 .stack:	equ	$
