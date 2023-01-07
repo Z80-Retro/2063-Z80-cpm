@@ -228,8 +228,8 @@ vdp_write:
 	or	0x40
 	out	(.vdp_reg),a		; VRAM address MSB to write
 
-	push	bc
-	pop	de			; DE = byte count
+	ld	d,b
+	ld	e,c			; DE = byte count
 
 	ld	c,.vdp_vram		; the I/O port number
 
@@ -262,11 +262,11 @@ if 1
 .vdp_write_loop:
 	outi				; note: this clobbers B
 
-	; fast counter logic (3.2 usec update rate @ 10 MHZ)
+	; fast counter logic (3.0 usec update rate @ 10 MHZ)
 	dec	e			; dec the LSB
-	jr	nz,.vdp_write_loop	; if no borrow then keep going
+	jp	nz,.vdp_write_loop	; if not zero then keep going
 	dec	d			; dec the MSB
-	jr	nz,.vdp_write_loop	; if no borrow then keep going
+	jp	nz,.vdp_write_loop	; if not zero then keep going
 	ret
 endif
 
@@ -280,7 +280,7 @@ if 0
 	dec	de
 	ld	a,d
 	or	e
-	jr	nz,.vdp_write_loop
+	jp	nz,.vdp_write_loop
 	ret
 endif
 
@@ -310,8 +310,8 @@ vdp_write_slow:
 	or	0x40
 	out	(.vdp_reg),a		; VRAM address MSB to write
 
-	push	bc
-	pop	de			; DE = byte count
+	ld	d,b
+	ld	e,c			; DE = byte count
 
 	ld	c,.vdp_vram		; the I/O port number
 
