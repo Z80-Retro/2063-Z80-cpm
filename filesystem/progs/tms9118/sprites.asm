@@ -254,6 +254,7 @@ endif
 ; This version is the Goldilocks speed 
 if 1
 	; if DE == 0 then this will copy 64K
+	ld	b,e
 	inc	e
 	dec	e
 	jr	z,.vdp_write_loop	; if E==0 then D is OK as-is
@@ -262,9 +263,14 @@ if 1
 .vdp_write_loop:
 	outi				; note: this clobbers B
 
+if 0
 	; fast counter logic (3.0 usec update rate @ 10 MHZ)
 	dec	e			; dec the LSB
 	jp	nz,.vdp_write_loop	; if not zero then keep going
+else
+	; fast counter logic (2.6 usec update rate @ 10 MHZ)
+	jp	nz,.vdp_write_loop
+endif
 	dec	d			; dec the MSB
 	jp	nz,.vdp_write_loop	; if not zero then keep going
 	ret
