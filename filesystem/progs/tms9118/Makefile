@@ -8,7 +8,8 @@ PROGS=\
 	mode1a.com \
 	m1t1.com \
 	m1t2.com \
-	sprites.com
+	sprites.com \
+	breakout.com
 
 
 all: $(PROGS)
