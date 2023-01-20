@@ -22,6 +22,10 @@
 ;
 ;****************************************************************************
 
+BDOS:		equ	0x0005		; BDOS entry address (for system calls)
+CON_STATUS:	equ	0x0b		; Get Console Status
+
+
 .vdp_vram:	equ	0x80		; VDP port for accessing the VRAM
 .vdp_reg:	equ	0x81		; VDP port for accessing the registers
 
@@ -43,10 +47,10 @@ joy_horiz_speed: equ	3		; movement rate pixel rate/field
 joy_vert_speed:	equ	1
 
 brick_row_len:	equ	32				; num tile patterns per row
-brick_row_1:	equ	brick_row_len*2			; the 2nd row
-brick_row_3:	equ	brick_row_1+brick_row_len*2	; the 4th row
-brick_row_5:	equ	brick_row_3+brick_row_len*2	; the 6th row
-brick_row_7:	equ	brick_row_5+brick_row_len*2	; the 8th row
+brick_row_1:	equ	brick_row_len*2			; offset to the 2nd row in the nametable
+brick_row_3:	equ	brick_row_1+brick_row_len*2	; offset to the 4th row
+brick_row_5:	equ	brick_row_3+brick_row_len*2	; offset to the 6th row
+brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 
 	org	0x100
 
@@ -82,6 +86,11 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; the 8th row
 .spriteloop:
 
 	; XXX check for a quit key to terminate the proggie here??
+	ld	c,CON_STATUS		; See if a console character is ready (nonblocking)
+	call	BDOS
+	or	a			; if A=0 then there is no character ready
+	jp	nz,terminate		; else there is a character, terminate the program
+
 
 	; Update the sprite position(s) and the display characters
 
@@ -201,6 +210,13 @@ endif
 
 	jp	.spriteloop
 
+
+
+;**********************************************************************
+; Clean up any mess we leave behind & return to CP/M
+;**********************************************************************
+terminate:
+	jp	0			; warm boot
 
 
 ;**********************************************************************
