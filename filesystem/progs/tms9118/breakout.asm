@@ -85,7 +85,7 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 	;******************************************
 .spriteloop:
 
-	; XXX check for a quit key to terminate the proggie here??
+	; Check for a quit key to terminate the proggie here??
 	ld	c,CON_STATUS		; See if a console character is ready (nonblocking)
 	call	BDOS
 	or	a			; if A=0 then there is no character ready
@@ -223,6 +223,13 @@ terminate:
 ; Wait for the VDP to indicate that it has finished rendering a frame
 ; and that we now have time to access the VDP RAM at high speed.
 ; Clobbers: AF
+;
+; WARNING: This is not reliable because the TMS9x18 does not appear to 
+;	properly synchronize the Frame Flag bit in its status register 
+;	with the read-select logic.  Some times it will return a 
+;	false-negative that will cause this loop to miss one and then 
+;	continue to for the next.  It does, however, work most of the 
+;	time. Therefore it is useful for testing non-critical code.
 ;**********************************************************************
 vdp_wait:
 	in	a,(.vdp_reg)		; read the VDP status register
@@ -241,7 +248,7 @@ vdp_wait:
 ;
 ; DE = VDP target memory address
 ; HL = host memory address
-; BC = number of bytes to write
+; BC = number of bytes to write (0 = 0x10000)
 ; Clobbers: AF, BC, DE, HL
 ;**********************************************************************
 vdp_write:
@@ -258,8 +265,6 @@ vdp_write:
 
 	ld	c,.vdp_vram		; the I/O port number
 
-;********************************************************************************
-; This version is the Goldilocks speed 
 	; if DE == 0 then this will copy 64K
 	ld	b,e			; use b as the LSB counter
 	inc	e
