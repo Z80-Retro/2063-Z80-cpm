@@ -122,7 +122,6 @@ ball_max_y:	equ	24*8-ball_height	; y position where the ball will hit the bottom
 ;*****************************************************************************
 ;*****************************************************************************
 
-
 ;*****************************************************************************
 ; If a quit key has been pressed, quit the program
 ;*****************************************************************************
@@ -281,8 +280,12 @@ endif
 ; and that we now have time to access the VDP RAM at high speed.
 ; Clobbers: AF
 ;
-; note: This is not reliable as it can miss flag events.  
-;	Need to monitor the IRQ line and then read the status register.
+; WARNING: This is not reliable because the TMS9x18 does not appear to 
+;	properly synchronize the Frame Flag bit in its status register 
+;	with the read-select logic.  Some times it will return a 
+;	false-negative that will cause this loop to miss one and then 
+;	continue to for the next.  It does, however, work most of the 
+;	time. Therefore it is useful for testing non-critical code.
 ;*****************************************************************************
 .vdp_wait:
 	in	a,(.vdp_reg)		; read the VDP status register
@@ -301,7 +304,7 @@ endif
 ;
 ; DE = VDP target memory address
 ; HL = host memory address
-; BC = number of bytes to write
+; BC = number of bytes to write (0 = 0x10000)
 ; Clobbers: AF, BC, DE, HL
 ;*****************************************************************************
 .vdp_write:

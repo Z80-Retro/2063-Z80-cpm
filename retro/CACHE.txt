@@ -1,0 +1,67 @@
+20230122 jrw -  Some scratchings on hash logic for an associative cache.
+
+
+; use a hash index to determine which cache set to search
+
+8-way set assoc cache (with 512 sets)
+
+lsec = 0..0xffff		; logical cpm sector number
+lsdblk = lsec>>2		; logical sd block (16-bits)
+ldisk = 0..15			; logical disk number (4-bits)
+
+chash = lsdblk&0x0ff ^ (lsdblk>>8)&0x0ff ^ ldisk
+
+cset = chash & 0x0007;		; 3-bit set number 
+cbank = chash & 0x0038>>3;	; 3-bit cache ram bank number
+
+; note that among ALL sets across ALL banks, the set number would simply be:
+
+set = chash & 0x003f;
+
+; With 8, 1-byte elements per set hash table, the scan start address is:
+
+p = set<<3;
+
+
+	ld	de,lsdblk	; the sd block number that we are searching for
+
+lookup:
+	ld	a,e		; a = lsdblk & 0x00ff
+	ld	hl,p		; hl = the cache set address offset to search within
+	ld	bc,set_hash_table
+	add	hl,bc
+	ld	bc,8
+	jp	scan_loop
+
+scan_loop_4:
+	dec	hl
+	dec	hl
+scan_loop_2:
+	dec	hl
+	dec	hl
+scan_loop:
+	cpir
+	jr	nz,not_found	; if not in the hash_table then is not in cache
+
+	; it was found...
+	; check if (lsdblk&0xff00>>8 == msb_hash_table[i] && ldisk == disk_hash_table[i])
+
+	; advance hl to a second 512-byte table
+	inc	hl		; HL += 0x100
+	inc	hl		; HL += 0x100
+	ld	a,d		; a = (lsdblk>>8) & 0x00ff
+	cp	(hl)
+	jr	nz,scan_loop_2
+
+	; advance hl to a third 512-byte table
+	inc	hl		; HL += 0x100
+	inc	hl		; HL += 0x100
+	ld	a,ldisk		; a = logical disk number
+	cp	(hl)
+	jr	nz,scan_loop_4
+
+found:
+	; at this point, BC = 0..7 representing the position in the table where was found
+
+
+not_found:
