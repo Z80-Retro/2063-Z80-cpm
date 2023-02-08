@@ -38,6 +38,16 @@ joy_up:		equ	0x80		; and-mask for up
 joy_down:	equ	0x40		; and-mask for down
 joy_btn:	equ	0x01		; and-mask for button
 
+; It is unfortunate that this does not match the joystick port bits.
+; The reason is to make the range of possible values 0..15 as opposed to 0..255.
+
+dir_down:	equ	1
+dir_right:	equ	2
+dir_up:		equ	4
+dir_left:	equ	8
+
+
+
 joy_horiz_min:	equ	0x00		; left of the screen
 joy_horiz_max:	equ	0x0100-8	; right of the screen - sprite width
 joy_vert_min:	equ	0x00		; top of the screen
@@ -52,12 +62,23 @@ brick_row_3:	equ	brick_row_1+brick_row_len*2	; offset to the 4th row
 brick_row_5:	equ	brick_row_3+brick_row_len*2	; offset to the 6th row
 brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 
+
+; note the sprite position is the upper-left corner of the sprite tile
+ball_width:	equ	8			; pixel-width of the ball sprite
+ball_height:	equ	8			; pixel-height of the ball sprite
+ball_min_x:	equ	0			; x position where the ball will hit the left wall
+ball_max_x:	equ	32*8-ball_width		; x position where the ball will hit the right wall
+ball_min_y:	equ	0			; y position where the ball will hit the top wall
+ball_max_y:	equ	24*8-ball_height	; y position where the ball will hit the bottom wall
+
+
+
 	org	0x100
 
 	ld	sp,.stack
 
 	; reset the game variables & display
-	call	reset
+	call	.reset
 
 
 	;******************************************
@@ -76,23 +97,49 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 	ld	hl,.vraminit		; buffer-o-bytes to send
 	ld	bc,.vraminit_len	; number of bytes to send
 	ld	de,0x0000		; VDP sprite attribute table starts at 0x1000
-	call	vdp_write_slow
+	call	.vdp_write_slow
+
 
 
 
 	;******************************************
 	; Play ball!
 	;******************************************
-.spriteloop:
+.gameloop:
+	call	.check_quitkey		; terminate the game if a quit-key has been pressed
+	call	.update_paddle		; read and update paddle position accordingly
+	call	.update_ball		; update the ball location & handle colisions
 
+	; wait for the next vertical blanking period
+	call	.vdp_wait		; wait for the end-of-frame flag
+	call	.flush_screen		; fluch the cached VRAM to the VDP
+
+	jp	.gameloop
+
+
+
+
+;*****************************************************************************
+;*****************************************************************************
+
+
+;*****************************************************************************
+; If a quit key has been pressed, quit the program
+;*****************************************************************************
+.check_quitkey:
 	; XXX check for a quit key to terminate the proggie here??
 	ld	c,CON_STATUS		; See if a console character is ready (nonblocking)
 	call	BDOS
 	or	a			; if A=0 then there is no character ready
-	jp	nz,terminate		; else there is a character, terminate the program
+	jp	nz,.terminate		; else there is a character, terminate the program
+
+	ret				; return to caller, nothing to do
 
 
-	; Update the sprite position(s) and the display characters
+;*****************************************************************************
+; Check the paddle/joystick and update any prosition changes.
+;*****************************************************************************
+.update_paddle:
 
 	ld	b,0x00			; B = direction mask: up=4, dn=1, rt=2, lt=8
 	ld	de,(.paddle0)		; D = x position, E = y position
@@ -108,7 +155,7 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 	jr	nz,.not_up
 
 	ld	a,b
-	or	0x04			; set the up bit in the direction character
+	or	dir_up			; set the up bit in the direction character
 	ld	b,a
 
 	ld	a,e			; A = current Y position
@@ -126,7 +173,7 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 	jr	nz,.not_down
 
 	ld	a,b
-	or	0x01			; set the down bit in the direction character
+	or	dir_down		; set the down bit in the direction character
 	ld	b,a
 
 	ld	a,e			; A = current Y position
@@ -144,7 +191,7 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 	jr	nz,.not_left
 
 	ld	a,b
-	or	0x08			; set the left bit in the direction character
+	or	dir_left		; set the left bit in the direction character
 	ld	b,a
 
 	ld	a,d			; A = current X position
@@ -162,7 +209,7 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 	jr	nz,.not_right
 
 	ld	a,b
-	or	0x02			;set the down bit in the direction character
+	or	dir_right		;set the right bit in the direction character
 	ld	b,a
 
 	ld	a,d			; A = current X position
@@ -174,11 +221,14 @@ brick_row_7:	equ	brick_row_5+brick_row_len*2	; offset to the 8th row
 .right_limit:
 .not_right:
 
+	ld	(.paddle0),de		; save sprite posn back into sprite attrib table
+
+	ld	a,b
+	ld	(.dir_heading),a	; save the current direction heading value
+
 	; XXX It is also probably a better idea not to bother doing this if nothing changed ;-)
 	;	...BUUUUT that would make it tougher to check timing on the scope.
 	;	...AAAAND the call to vdp_wait is how the game speed is governed.
-
-	ld	(.paddle0),de		; store sprite posn back into sprite attrib table
 
 	; update the character code representing the mouse direction
 	; XXX This would run faster if done custom while transferring data into the VDP name table.
@@ -193,45 +243,55 @@ if 0
 	ldir				; copy the direction arrow to entire screen
 endif
 
-	; wait for the next vertical blanking period
-	call	vdp_wait
+	ret
 
+
+
+
+;*****************************************************************************
+; Flush the cached copy of the VRAM using a fast VDP write transfer.
+; note: Only want to do this right after the VDP frame flag is set.
+;*****************************************************************************
+.flush_screen:
 	; flush the sprite attribute table
 	ld	hl,.spriteattr		; buffer-o-bytes to send
 	ld	bc,.spriteattr_len 	; number of bytes to send
 	ld	de,0x1000		; VDP sprite attribute table starts at 0x1000
-	call	vdp_write
+	call	.vdp_write
 
 	; flush the name table
 	ld	hl,.nametable		; buffer-o-bytes to send
 	ld	bc,.nametable_len	; number of bytes to send
 	ld	de,0x1400		; VDP name table starts at 0x1400
-	call	vdp_write
+	call	.vdp_write
 
-	jp	.spriteloop
-
-
-
-;**********************************************************************
-; Clean up any mess we leave behind & return to CP/M
-;**********************************************************************
-terminate:
-	jp	0			; warm boot
-
-
-;**********************************************************************
-; Wait for the VDP to indicate that it has finished rendering a frame
-; and that we now have time to access the VDP RAM at high speed.
-; Clobbers: AF
-;**********************************************************************
-vdp_wait:
-	in	a,(.vdp_reg)		; read the VDP status register
-	and	0x80			; frame flag on?
-	jp	z,vdp_wait
 	ret
 
 
-;**********************************************************************
+
+;*****************************************************************************
+; Clean up any mess we leave behind & return to CP/M
+;*****************************************************************************
+.terminate:
+	jp	0			; warm boot
+
+
+;*****************************************************************************
+; Wait for the VDP to indicate that it has finished rendering a frame
+; and that we now have time to access the VDP RAM at high speed.
+; Clobbers: AF
+;
+; note: This is not reliable as it can miss flag events.  
+;	Need to monitor the IRQ line and then read the status register.
+;*****************************************************************************
+.vdp_wait:
+	in	a,(.vdp_reg)		; read the VDP status register
+	and	0x80			; frame flag on?
+	jp	z,.vdp_wait
+	ret
+
+
+;*****************************************************************************
 ; Copy a given memory buffer into the VDP buffer
 ;
 ; The VDP requires 2usec per VRAM write during the 4300 usec time 
@@ -243,8 +303,8 @@ vdp_wait:
 ; HL = host memory address
 ; BC = number of bytes to write
 ; Clobbers: AF, BC, DE, HL
-;**********************************************************************
-vdp_write:
+;*****************************************************************************
+.vdp_write:
 	; copy the new sprite location values into the VRAM
 	; Set the VRAM write address
 	ld	a,e
@@ -258,7 +318,7 @@ vdp_write:
 
 	ld	c,.vdp_vram		; the I/O port number
 
-;********************************************************************************
+;*****************************************************************************
 ; This version is the Goldilocks speed 
 	; if DE == 0 then this will copy 64K
 	ld	b,e			; use b as the LSB counter
@@ -288,7 +348,7 @@ endif
 
 
 
-;**********************************************************************
+;*****************************************************************************
 ; Copy a given memory buffer into the VDP buffer.  
 ;
 ; This is the same as vdp_write but it runs slow enough to be used 
@@ -302,8 +362,8 @@ endif
 ; HL = host memory address
 ; BC = number of bytes to write
 ; Clobbers: AF, BC, DE, HL
-;**********************************************************************
-vdp_write_slow:
+;*****************************************************************************
+.vdp_write_slow:
 	; copy the new sprite location values into the VRAM
 	; Set the VRAM write address
 	ld	a,e
@@ -331,26 +391,100 @@ vdp_write_slow:
 	ld	a,d
 	or	e
 	jr	nz,.vdp_write_slow_loop
+
 	ret
 
 
 ;********************************************************************************
+; If the ball has hit a wall then negate the appropriate .ball_d[xy] value.
+;********************************************************************************
+if 0
+.update_ball:
+	ld	de,(.ball)		; e=y, d=x
+	ld	a,(.ball_dx)		; determine the sign (dir) of the x movement
+	add	d
+	ld	d,a
+	ld	a,(.ball_dy)
+	add	e
+	ld	e,a
+	ld	(.ball),de
+
+	ret
+endif
+
+if 1
+; XXX this ONLY works if dx and dy are 1
+.update_ball:
+
+	; horizontal movement
+	ld	c,ball_min_x		; assume moving to the left
+	ld	a,(.ball_dx)		; determine the sign (dir) of the x movement
+	ld	d,a			; D = .ball_dx
+	or	a
+	jp	m,.ball_check_x
+	ld	c,ball_max_x		; move to the right
+.ball_check_x:
+	ld	a,(.ball_x)		; A = .ball_x
+	ld	b,a			; B = .ball_x
+	cp	c			; A == max/min x value ?
+	jp	nz,.ball_go_x		; no ? then OK to move it dx pixels
+	ld	a,d			; else, negate the dx value
+	neg				; A = -A
+	ld	(.ball_dx),a
+.ball_go_x:
+	ld	a,b			; A = .ball_x
+	add	d			; A = .ball_x + .ball_dx
+	ld	(.ball_x),a		; .ball_x = .ball_x + .ball_dx
+
+	; vertical movement
+	ld	c,ball_min_y		; assume moving to the left
+	ld	a,(.ball_dy)		; determine the sign (dir) of the y movement
+	ld	d,a			; D = .ball_dy
+	or	a
+	jp	m,.ball_check_y
+	ld	c,ball_max_y		; move to the right
+.ball_check_y:
+	ld	a,(.ball_y)		; A = .ball_y
+	ld	b,a			; B = .ball_y
+	cp	c			; A == max/min y value ?
+	jp	nz,.ball_go_y		; no ? then OK to move it dy pixels
+	ld	a,d			; else, negate the dy value
+	neg				; A = -A
+	ld	(.ball_dy),a
+.ball_go_y:
+	ld	a,b			; A = .ball_y
+	add	d			; A = .ball_y + .ball_dy
+	ld	(.ball_y),a		; .ball_y = .ball_y + .ball_dy
+
+	ret
+endif
+
+
+
+;********************************************************************************
 ; TODO
-; - draw one brick with rounded ends
-; - place ball 
-; - place paddle (including a width of 1X, 2X, or 3X)
-; - check for paddle-ball colision
-; - advance ball position (using current speed and heading)
-; - change ball heading (used when hit a wall, brick or paddle) 
+; - draw one brick at a given position (with rounded ends?)
+; - place paddle (including a width of 1X, 2X, or 3X?)
+; - determine if the ball has hit a brick
+; - determine if the ball is colliding with the the left, center, or right of the paddle
 ;
 ;********************************************************************************
+
+.dir_heading:	db	0			; see dir_xxxx
+
+
+; The .ball_d[xy] values are added to the current ball position
+; each time that .update_ball is called (normally, once per frame.)
+.ball_dx:	db	1			; distance to move each frame
+.ball_dy:	db	1 			; distance to move each frame
+
 
 
 ;********************************************************************************
 ; reset all of the game variables & the display (name table) to start a game. 
 ;********************************************************************************
 
-reset:
+.reset:
 	; blank the screen
 	ld	hl,.nametable
 	ld	(hl),0x00
@@ -393,7 +527,14 @@ reset:
 	ld	d,32*8-8	; horiz posn (right)
 	ld	(.ball),de
 
+	; clear the current joystick direction/heading
+	xor	a
+	ld	(.dir_heading),a
+
 	ret 
+
+
+;********************************************************************************
 
 
 ;********************************************************************************
@@ -490,7 +631,9 @@ reset:
 
 ; sprite 1 is the ball
 .ball:
+.ball_y:
 	db	24*8/2-16/2	; vertical position.
+.ball_x:
 	db	32*8/2-16/2	; horizontal position.
 	db	0x01		; pattern name number (ball)
 	db	0x0f		; early clock & color (white)
