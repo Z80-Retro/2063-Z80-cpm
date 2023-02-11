@@ -10,24 +10,40 @@
 # To list the files that are in the created image:
 # make lsimg
 
+SUBDIRS=\
+	progs/tty \
+	progs/example \
+	progs/tms9118
 
-all: retro.img
+CLEAN_DIRS=$(SUBDIRS:%=clean-%)
+ALL_DIRS=$(SUBDIRS:%=all-%)
 
-retro.img: ../retro/retro.bin ../cpm22/filesystem/* adventure/adv-B03
+.PHONY: all clean $(CLEAN_DIRS) $(ALL_DIRS)
+
+all:: $(ALL_DIRS)
+
+clean:: $(CLEAN_DIRS)
+
+world:: clean all
+
+$(ALL_DIRS):
+	$(MAKE) -C $(@:all-%=%) all
+
+$(CLEAN_DIRS):
+	$(MAKE) -C $(@:clean-%=%) clean
+
+
+
+
+all:: retro.img
+
+retro.img: ../retro/retro.bin 
 	rm -f retro.img
 	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
 	cpmcp -f z80-retro-2k-8m retro.img ../cpm22/filesystem/* 0:
+	cpmcp -f z80-retro-2k-8m retro.img assemblers/sid/*.com 0:
 	cpmcp -f z80-retro-2k-8m retro.img adventure/adv-B03/* 0:
-
-tms9118: retro.img
-	if [ `ls -1 progs/tms9118/*.com 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0: ; \
-	fi
-
-assemblers: retro.img
-	if [ `ls -1 assemblers/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f z80-retro-2k-8m retro.img assemblers/*/* 0: ; \
-	fi
+	cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0:
 
 local: retro.img
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
@@ -41,17 +57,13 @@ local: retro.img
 	fi
 
 
-world: clean all
-
-adventure/adv-B03: adventure/cpm-advent.zip
-	unzip -d adventure adventure/cpm-advent.zip
-
+# this is where the adventure game files came from:
 adventure/cpm-advent.zip:
 	wget -P adventure https://ifarchive.org/if-archive/games/cpm/cpm-advent.zip 
 
-clean:
+
+clean::
 	rm -f retro.img 
-	rm -rf `find adventure/* -name \*.zip -o -print`
 
 burn: retro.img
 	if [ `hostname` = "raspberrypi" ]; then \
