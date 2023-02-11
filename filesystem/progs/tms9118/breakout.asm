@@ -400,6 +400,12 @@ endif
 
 ;********************************************************************************
 ; If the ball has hit a wall then negate the appropriate .ball_d[xy] value.
+;
+; TODO 
+; - set a flag if hit a wall
+; - set a flag if hit the paddle
+; - set a flag if hit the bottom of the screen (out of bounds)
+; - set a flag if hit a brick & note which one
 ;********************************************************************************
 if 0
 .update_ball:
