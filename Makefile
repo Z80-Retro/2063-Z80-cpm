@@ -48,5 +48,5 @@ REL_FILES=\
 	filesystem/progs/README.md
 
 release:
-	rm -f 2063-Z80-cpm.tar
-	zip -r 2063-Z80-cpm.tar $(REL_FILES)
+	rm -f 2063-Z80-cpm.zip
+	zip -r 2063-Z80-cpm.zip $(REL_FILES)
