@@ -3,6 +3,13 @@
 A BIOS and build scripts for installing CP/M 2.2 on an SD card for the [Z80 Retro! board.
 ](https://github.com/johnwinans/2063-Z80)
 
+## How to Clone This Repo
+
+Since incorporating the use of submodules, the process of 'getting everything' requires a command that will recursively download all of the parts like this:
+
+	git clone --recurse-submodules git@github.com:johnwinans/2063-Z80-cpm.git
+
+
 ## How to Avoid Spoilers!
 
 Starting on 20220304 you can avoid any spoilers while watching my 
