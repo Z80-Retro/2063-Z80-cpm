@@ -1,4 +1,4 @@
-# Build a filesystem from the cpm22 distro files, retro.asm BIOS, and some
+# Build a filesystem from the cpm-2.2 distro files, retro.asm BIOS, and some
 # sample downloads like adventure.
 #
 # To create an image with CP/M distro plus adventure:
@@ -40,7 +40,7 @@ all:: retro.img
 retro.img: ../retro/retro.bin 
 	rm -f retro.img
 	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
-	cpmcp -f z80-retro-2k-8m retro.img ../cpm22/filesystem/* 0:
+	cpmcp -f z80-retro-2k-8m retro.img ../cpm-2.2/filesystem/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img assemblers/sid/*.com 0:
 	cpmcp -f z80-retro-2k-8m retro.img adventure/adv-B03/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0:

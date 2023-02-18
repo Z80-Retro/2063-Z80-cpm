@@ -2,7 +2,6 @@ SUBDIRS=\
 	boot \
 	tests \
 	hello \
-	cpm22 \
 	retro \
 	filesystem
 

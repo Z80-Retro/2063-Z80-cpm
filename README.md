@@ -25,13 +25,14 @@ See the code in [./hello](./hello) to create a program that will load and run fr
 
 ## Where to download CP/M 
 
-[The Unofficial CP/M Web site](http://www.cpm.z80.de/) contains:
-- [source code](http://www.cpm.z80.de/source.html) of various CP/M releases:
-  - We want the link that says: [CP/M 2,2 ASM SOURCE code](http://www.cpm.z80.de/download/cpm2-asm.zip)
-- Application program [binaries](http://www.cpm.z80.de/binary.html) that can run on the Retro!
-  - We want the link that says: [CP/M 2.2 BINARY](http://www.cpm.z80.de/download/cpm22-b.zip) distribution disk for the Xerox 1800 system
+After the clarification of the Digital Research Inc. license in 2022 on the use and distribution of CP/M, all of the files needed to build and run CP/M on the Retro have been made available on github in the [Z80-Retro/cpm-2.2](https://github.com/Z80-Retro/cpm-2.2) repo.
 
-See [./cpm22](./cpm22) for details on downloading and preparing the files for assembly.
+The CP/M source, utilities, and manuals were collected from the [The Unofficial CP/M Web site](http://www.cpm.z80.de/) in 2023:
+- [source code](http://www.cpm.z80.de/source.html) of various CP/M releases:
+  - I used the link that says: [CP/M 2,2 ASM SOURCE code](http://www.cpm.z80.de/download/cpm2-asm.zip)
+- Application program [binaries](http://www.cpm.z80.de/binary.html) that can run on the Retro!
+  - I used the link that says: [CP/M 2.2 BINARY](http://www.cpm.z80.de/download/cpm22-b.zip) distribution disk for the Xerox 1800 system
+
 
 ## Build and install CP/M
 
@@ -39,21 +40,10 @@ See [./retro](./retro) for details on assembling and installing CP/M onto an SD 
 
 ## Resource Links
 
+- [CP/M Manuals](https://github.com/Z80-Retro/manuals)
 - Individual manual booklets (for the purists):
-  - [Introduction to CPM Features and Facilities](http://www.cpm.z80.de/randyfiles/DRI/Intro_to_CPM_Feat_and_Facilities.pdf)
-  - [CP/M 2.0 Guide for CP/M 1.4 Users](http://www.cpm.z80.de/randyfiles/DRI/CPM_2_0_UG_for_CPM_1_4_Users.pdf)
-  - [ED (A Text Editor)](http://www.cpm.z80.de/randyfiles/DRI/ED.pdf)
-  - [DDT (Dynamic Debugging Tool)](http://www.cpm.z80.de/randyfiles/DRI/DDT.pdf)
-  - [ASM (An 8080 Assembler)](http://www.cpm.z80.de/randyfiles/DRI/ASM.pdf)
-  - [CP/M 2.0 Interface Guide](http://www.cpm.z80.de/randyfiles/DRI/CPM_2_0_Interface_Guide.pdf)
-  - [CP/M 2.0 System Alteration Guide](http://www.cpm.z80.de/randyfiles/DRI/CPM_2_0_System_Alteration_Guide.pdf)
-  - [CP/M 2.2 System Alteration Guide](http://bitsavers.trailing-edge.com/pdf/digitalResearch/cpm/2.2/CPM_2.2_Alteration_Guide_1979.pdf)
-- One big book of all the above manuals
-  - [CP/M 2.x Operating System Manual](http://bitsavers.trailing-edge.com/pdf/digitalResearch/cpm/CPM_Operating_System_Manual_Jul82.pdf)
 
 - [The Unofficial CP/M Web site](http://www.cpm.z80.de/index.html)
-- Genuine Internet hearsay evidence that *suggests* that CP/M can be used in for personal use! 
-  - http://www.gaby.de/faq.htm#5
 - The PC parallel printer interface port pinout and signal meanings
   - https://bixolonusa.com/wp-content/uploads/2016/06/parallel.pdf
 - The Humongous CP/M Software Archives
