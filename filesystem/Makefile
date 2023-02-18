@@ -42,7 +42,7 @@ retro.img: ../retro/retro.bin
 	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
 	cpmcp -f z80-retro-2k-8m retro.img ../cpm-2.2/filesystem/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img assemblers/sid/*.com 0:
-	cpmcp -f z80-retro-2k-8m retro.img adventure/adv-B03/* 0:
+	cpmcp -f z80-retro-2k-8m retro.img adventure/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0:
 
 local: retro.img
