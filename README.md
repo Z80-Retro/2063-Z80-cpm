@@ -7,11 +7,11 @@ A BIOS and build scripts for installing CP/M 2.2 on an SD card for the [Z80 Retr
 
 Since incorporating the use of submodules, the process of 'getting everything' requires a command that will recursively download all of the parts like this:
 
-	git clone --recurse-submodules https://github.com/johnwinans/2063-Z80-cpm.git
+	git clone --recurse-submodules https://github.com/Z80-Retro/2063-Z80-cpm.git
 
 or, if you use ssh (useful if you want to push changes to a repo to make a pull request):
 
-	git clone --recurse-submodules git@github.com:johnwinans/2063-Z80-cpm.git
+	git clone --recurse-submodules git@github.com:Z80-Retro/2063-Z80-cpm.git
 
 
 ## How to Avoid Spoilers!
