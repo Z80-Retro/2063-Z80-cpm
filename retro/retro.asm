@@ -84,7 +84,7 @@ include	'memory.asm'
 ;
 ;##########################################################################
 
-include '../cpm-2.2/src/cpm22.asm'
+include 'cpm22.asm'
 
 
 ;##########################################################################
@@ -476,28 +476,35 @@ endif
 ; If there is an attempt to select a non-existent drive, SELDSK returns
 ; HL=0000H as an error indicator.
 ;
-; The Z80 Retro! only has one drive.
+; The Z80 Retro! only has 4 disks
 ;
+; Modified for 4 disks (A,B,C & D) by Trevor Jacobs 02/16/2023
 ;##########################################################################
-.bios_seldsk:
-	ld	a,c
-	ld	(bios_disk_disk),a		; XXX should we save this now or defer 
-					; till after we validate the value?
-
+.bios_seldsk:		;select disk given by bc - from alteration guide p26
+	ld	a,c 
+	ld	hl,0		; HL = 0 = invalid disk
+	cp	4			; highest disk number+1 (valid disk # = 0-3)
+	ret nc			; if disk number is not valid return error
+	;
+	ld	(bios_disk_current_disk),a	;safe to update disk number - no error
+	;
 if .debug >= 2
 	call	iputs
 	db	".bios_seldsk entered: \0"
 	call	bios_debug_disk
 endif
-
-	ld	hl,0			; HL = 0 = invalid disk 
-	ld	a,(bios_disk_disk)
-	or	a			; did drive A get selected?
-	ret	nz			; no -> error
-
-	ld	hl,.bios_dph		; the DPH for disk A
+	;
+	ld	a,(bios_disk_current_disk)	;a gets destoyed by debug so must reload
+	ld	l,c			; low (disk)
+	ld	h,b			; high (disk)
+	add	hl,hl		; *2
+	add	hl,hl		; *4
+	add hl,hl		; *8
+	add hl,hl		; *16
+	ld	de,.bios_dph	; base address of DPH table
+	add	hl,de		; address of DPH table for selected disk in hl	
 	ret
-
+	
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p19:
@@ -548,7 +555,7 @@ bios_debug_disk:
 	call	iputs
 	db	'disk=0x\0'
 
-	ld	a,(bios_disk_disk)
+	ld	a,(bios_disk_current_disk)
 	call	hexdump_a
 
 	call    iputs
@@ -583,9 +590,9 @@ endif
 
 ;include 'rw_stub.asm'
 ;include 'rw_nocache.asm'
-include 'rw_dmcache.asm'
-
-
+;include 'rw_dmcache.asm'
+include 'rw_nocache_md.asm'		;read/write routine for multiple disks
+								;Trevor Jacobs - 02-16-2023
 
 
 ;##########################################################################
@@ -652,8 +659,11 @@ bios_disk_dma:				; last set value of the DMA buffer address
 bios_disk_track:			; last set value of the disk track
 	dw	0xa5a5
 
-bios_disk_disk:				; last set value of the selected disk
-	db	0xa5
+bios_disk_current_disk:		; current set value of the selected disk
+	db	0x00
+	
+bios_disk_last_disk:		; last set value of the selected disk	
+	db	0x00
 
 bios_disk_sector:			; last set value of of the disk sector
 	dw	0xa5a5
@@ -694,40 +704,86 @@ bios_disk_sector:			; last set value of of the disk sector
 ; ** NOTE: This filesystem design is inefficient because it is unlikely
 ;          that ALL of the allocation blocks will ultimately get used!
 ;
+; Modified for 4 disks (A,B,C & D) by Trevor Jacobs 02/16/2023
 ;##########################################################################
 .bios_dph:
+
+.bios_disk_0-a:
 	dw	0		; XLT sector translation table (no xlation done)
 	dw	0		; scratchpad
 	dw	0		; scratchpad
 	dw	0		; scratchpad
-	dw	.bios_dirbuf	; DIRBUF pointer
-	dw	.bios_dpb_a	; DPB pointer
+	dw	.bios_dirbuf	; DIRBUF pointer - all disks use same buffer
+	dw	.bios_dpb	; DPB pointer - all disks us same disk parameters
 	dw	0		; CSV pointer (optional, not implemented)
 	dw	.bios_alv_a	; ALV pointer
+	
+.bios_disk_1-b:
+	dw	0		; XLT sector translation table (no xlation done)
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	.bios_dirbuf	; DIRBUF pointer - all disks use same buffer
+	dw	.bios_dpb	; DPB pointer - all disks us same disk parameters
+	dw	0		; CSV pointer (optional, not implemented)
+	dw	.bios_alv_b	; ALV pointer
+	
+.bios_disk_2-c:
+	dw	0		; XLT sector translation table (no xlation done)
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	.bios_dirbuf	; DIRBUF pointer - all disks use same buffer
+	dw	.bios_dpb	; DPB pointer - all disks us same disk parameters
+	dw	0		; CSV pointer (optional, not implemented)
+	dw	.bios_alv_c	; ALV pointer
+	
+.bios_disk_3-d:
+	dw	0		; XLT sector translation table (no xlation done)
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	.bios_dirbuf	; DIRBUF pointer - all disks use same buffer
+	dw	.bios_dpb	; DPB pointer - all disks us same disk parameters
+	dw	0		; CSV pointer (optional, not implemented)
+	dw	.bios_alv_d ; ALV pointer	
 
+	
 .bios_dirbuf:
 	ds	128		; scratch directory buffer
 .bios_wboot_stack:		; (ab)use the BDOS directory buffer as a stack during WBOOT
 
-.bios_dpb_a:
+.bios_dpb:
 	dw	4		; SPT
 	db	4		; BSH
 	db	15		; BLM
 	db	0		; EXM
-	dw	4087		; DSM (max allocation block number)
+	dw	4087	; DSM (max allocation block number)
 	dw	511		; DRM
-	db	0xff		; AL0
-	db	0x00		; AL1
+	db	0xff	; AL0
+	db	0x00	; AL1
 	dw	0		; CKS
 	dw	32		; OFF
+		
+;Why not just make the alv defined segments 512 bytes - a block?
+;instead of 511.875 bytes - (4087/8)+1
+;ALV takes up a lot of RAM when you have 16 disks 8K!!!	
 
 .bios_alv_a:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk a allocation info
 .bios_alv_a_end:
 
+.bios_alv_b:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk b allocation info
+.bios_alv_b_end:
 
+.bios_alv_c:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk c allocation info
+.bios_alv_c_end:
 
-
+.bios_alv_d:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk d allocation info
+.bios_alv_d_end:
 
 ;##########################################################################
 ; Temporary stack used for BIOS calls needing more than a few stack levels.
