@@ -40,4 +40,4 @@ Slot 3: sudo dd if=3.img of=/dev/mmcblk0p1 bs=512 seek=03x16384 conv=fsync statu
 You don't have to write to each slot in any order. For instance if you wanted a new disk image in 
 slot 3, you could just write the new image to slot 3. It won't effect the other slots. The image in 
 slot 0 must contain the BIOS (retro.bin) or it won't boot. See John's note on CP/M Tools and creating
-disk images.
+disk images here: https://github.com/Z80-Retro/2063-Z80-cpm/blob/main/filesystem/README.md
