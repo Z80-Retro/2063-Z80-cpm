@@ -492,9 +492,9 @@ if .debug >= 2
 	call	iputs
 	db	".bios_seldsk entered: \0"
 	call	bios_debug_disk
+	ld	a,(bios_disk_current_disk)	;a gets destoyed by debug so must reload
 endif
 	;
-	ld	a,(bios_disk_current_disk)	;a gets destoyed by debug so must reload
 	ld	l,c			; low (disk)
 	ld	h,b			; high (disk)
 	add	hl,hl		; *2
