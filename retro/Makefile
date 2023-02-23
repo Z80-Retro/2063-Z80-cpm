@@ -12,5 +12,6 @@ GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
 
 world: clean all
 
-retro.bin: ../cpm-2.2/src/cpm22.asm retro.asm rw_dmcache.asm rw_nocache.asm rw_stub.asm
+retro.bin: ../cpm-2.2/src/cpm22.asm retro.asm rw_dmcache.asm rw_nocache.asm rw_stub.asm rw_nocache_md.asm
+
 
