@@ -1,0 +1,43 @@
+1. Use lsblk to find your MicroSD card name. Mine is mmcblk0 because I use a MicroSD card adapter in an SD card slot on my laptop.
+It could also be sdb, sdc etc if you use a USB adapter. BE CERTAIN YOU HAVE THE CORRECT DEVICE TO AVOID DESTROYING DATA! You can run lsblk before you insert your MicroSD card and then run it again after you have inserted your MicroSD card and see what the new device is. That is your MicroSD card.
+
+2. Clear the MicroSD card before making a partition:
+
+sudo dd if=/dev/zero of=/dev/mmcblk0 bs=512 conv=fsync count=264192 status=progress
+
+3. Make a partion on the MicroSD card with parted:
+
+sudo parted /dev/mmcblk0
+GNU Parted 3.4
+Using /dev/mmcblk0
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) mklabel msdos 
+(parted) mkpart primary 1MiB 129MiB  
+(parted) print                            
+Model: SD NCard (sd/mmc)
+Disk /dev/mmcblk0: 15.6GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End    Size   Type     File system  Flags
+ 1      1049kB  135MB  134MB  primary               lba
+
+(parted) q
+
+4. Write a disk image to a disk slot on the disk partition. Slots are numbered 0-15. Each slot is
+16384 blocks in size (0x4000). seek=01x16384 - 16384 in decimal is the start of the 
+second disk slot. You don't need the seek statement for disk 0, but it's included for consistency.
+Currently only disk slots 0-3 are supported by the Z80 Retro. It can support up to 16 8MB disks,
+but this would require 8K of RAM (512 byte ALV buffer per drive), which in my opinion is a 
+waste of RAM unless really needed. We'll be looking at this more.
+
+Slot 0: sudo dd if=0.img of=/dev/mmcblk0p1 bs=512 seek=00x16384 conv=fsync status=progress
+Slot 1: sudo dd if=1.img of=/dev/mmcblk0p1 bs=512 seek=01x16384 conv=fsync status=progress
+Slot 2: sudo dd if=2.img of=/dev/mmcblk0p1 bs=512 seek=02x16384 conv=fsync status=progress
+Slot 3: sudo dd if=3.img of=/dev/mmcblk0p1 bs=512 seek=03x16384 conv=fsync status=progress
+
+You don't have to write to each slot in any order. For instance if you wanted a new disk image in 
+slot 3, you could just write the new image to slot 3. It won't effect the other slots. The image in 
+slot 0 must contain the BIOS (retro.bin) or it won't boot. See John's note on CP/M Tools and creating
+disk images here: https://github.com/Z80-Retro/2063-Z80-cpm/blob/main/filesystem/README.md
