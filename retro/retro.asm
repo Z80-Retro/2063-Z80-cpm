@@ -107,6 +107,17 @@ CONOUT: JP      .bios_conout
 LIST:   JP      .bios_list
 PUNCH:  JP      .bios_punch
 READER: JP      .bios_reader
+HOME:   JP      disk_home
+SELDSK: JP      disk_seldsk
+SETTRK: JP      disk_settrk
+SETSEC: JP      disk_setsec
+SETDMA: JP      disk_setdma
+READ:   JP      disk_read
+WRITE:  JP      disk_write
+PRSTAT: JP      .bios_prstat
+SECTRN: JP      disk_sectrn
+
+if 0
 HOME:   JP      .bios_home
 SELDSK: JP      .bios_seldsk
 SETTRK: JP      .bios_settrk
@@ -116,6 +127,7 @@ READ:   JP      bios_read
 WRITE:  JP      bios_write
 PRSTAT: JP      .bios_prstat
 SECTRN: JP      .bios_sectrn
+endif
 
 
 
@@ -583,7 +595,9 @@ endif
 
 ;include 'rw_stub.asm'
 ;include 'rw_nocache.asm'
-include 'rw_dmcache.asm'
+;include 'rw_dmcache.asm'
+
+include 'nhacp.asm'
 
 
 
