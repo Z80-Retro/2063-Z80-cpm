@@ -25,13 +25,14 @@
 
 ; For performance reasons, the SIO driver is not used and the access is in-lined here.
 
-.debug:         equ     1
+.nhacp_debug:         equ     1
 
 
 ;****************************************************************************
 ;****************************************************************************
+rw_init:
 nhacp_init:
-if .debug >= 1
+if .nhacp_debug >= 1
 	call    iputs
 	db	"nhacp_init entered\r\n\0"
 	ld	a,(.nhacp_disk)
@@ -48,7 +49,7 @@ nhacp_seldsk:
         ld      a,c
         ld      (.nhacp_disk),a
 
-if .debug >= 1
+if .nhacp_debug >= 2
 	call    iputs
 	db	"nhacp_seldsk entered\r\n\0"
 	ld	a,(.nhacp_disk)
@@ -64,12 +65,12 @@ endif
 
 ;****************************************************************************
 ;****************************************************************************
-disk_home
+disk_home:
 nhacp_home:
 	ld	bc,0			; just set the track number to zero
 	ld	(.nhacp_track),bc
 
-if .debug >= 1
+if .nhacp_debug >= 2
 	call	iputs
 	db	"nhacp_home entered:\r\n\0"
 	call	.nhacp_dump_disk
@@ -81,7 +82,7 @@ endif
 disk_settrk:
 nhacp_settrk:
 	ld	(.nhacp_track),bc
-if .debug >= 1
+if .nhacp_debug >= 2
 	call	iputs
 	db	"nhacp_settrk entered:\r\n\0"
 	call	.nhacp_dump_disk
@@ -96,7 +97,7 @@ disk_setsec:
 nhacp_setsec:
 	ld	(.nhacp_sec),bc
 
-if .debug >= 1
+if .nhacp_debug >= 2
 	call	iputs
 	db	"nhacp_setsec entered:\r\n\0"
 	call	.nhacp_dump_disk
@@ -110,7 +111,7 @@ disk_setdma:
 nhacp_setdma:
 	ld	(.nhacp_dma),bc
 
-if .debug >= 1
+if .nhacp_debug >= 2
 	call	iputs
 	db	"nhacp_setdma entered:\r\n\0"
 	call	.nhacp_dump_disk
@@ -133,7 +134,7 @@ nhacp_sectrn:
 ;****************************************************************************
 disk_write:
 nhacp_write:
-if .debug >= 1
+if .nhacp_debug >= 1
 	call	iputs
 	db	"nhacp_write entered:\r\n\0"
 	call	.nhacp_dump_disk
@@ -148,7 +149,7 @@ endif
 disk_read:
 nhacp_read:
 
-if .debug >= 1
+if .nhacp_debug >= 1
 	call	iputs
 	db	"nhacp_read entered:\r\n\0"
 	call	.nhacp_dump_disk
@@ -166,7 +167,7 @@ endif
 	ret
 
 
-if .debug >= 1
+if .nhacp_debug >= 1
 .nhacp_dump_disk:
         call    iputs
         db      'disk=0x\0'
@@ -212,6 +213,7 @@ endif
 	dw	0
 
 
+
 ;##########################################################################
 ; Define a CP/M-compatible filesystem intended to be network-mounted 
 ; using NHACP.
@@ -249,7 +251,7 @@ endif
         dw      0               ; scratchpad
         dw      0               ; scratchpad
         dw      0               ; scratchpad
-        dw      .nhacp_dirbuf   ; DIRBUF pointer
+        dw      disk_dirbuf   	; system-wide, shared DIRBUF pointer
         dw      .nhacp_dpb_a    ; DPB pointer
         dw      0               ; CSV pointer (optional, not implemented)
         dw      .nhacp_alv_a    ; ALV pointer

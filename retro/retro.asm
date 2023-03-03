@@ -227,9 +227,9 @@ endif
 
 .bios_wboot:
 
-	; We can't just blindly set SP=bios_stack here because bios_read will overwrite it!
+	; We can't just blindly set SP=bios_stack here because disk_read can overwrite it!
 	; But we CAN set to use other areas that we KNOW are not currently in use!
-	ld	sp,.bios_wboot_stack			; the .bios_dirbuf is garbage right now
+	ld	sp,.bios_wboot_stack			; the disk_dirbuf is garbage right now
 
 
 if .debug >= 2
@@ -259,9 +259,9 @@ endif
 .wboot_loop:
 	push	bc			; save the remaining sector count
 
-	call	bios_read		; read 1 sector
+	call	disk_read		; read 1 sector
 
-	or	a			; bios_read sets A=0 on success
+	or	a			; disk_read sets A=0 on success
 	jr	z,.wboot_sec_ok		; if read was OK, continue processing
 
 	; If there was a read error, stop.
@@ -658,7 +658,7 @@ gpio_out_cache: ds  1			; GPIO output latch cache
 ;##########################################################################
 ; The bios_disk_XXX values are used to retain the most recent values that
 ; have been set by the .bios_setXXX routines.
-; These are used by the bios_read and bios_write routines.
+; These are used by the disk_read and disk_write routines.
 ;##########################################################################
 bios_disk_dma:				; last set value of the DMA buffer address
 	dw	0xa5a5
@@ -714,14 +714,10 @@ bios_disk_sector:			; last set value of of the disk sector
 	dw	0		; scratchpad
 	dw	0		; scratchpad
 	dw	0		; scratchpad
-	dw	.bios_dirbuf	; DIRBUF pointer
+	dw	disk_dirbuf	; DIRBUF pointer
 	dw	.bios_dpb_a	; DPB pointer
 	dw	0		; CSV pointer (optional, not implemented)
 	dw	.bios_alv_a	; ALV pointer
-
-.bios_dirbuf:
-	ds	128		; scratch directory buffer
-.bios_wboot_stack:		; (ab)use the BDOS directory buffer as a stack during WBOOT
 
 .bios_dpb_a:
 	dw	4		; SPT
@@ -740,6 +736,10 @@ bios_disk_sector:			; last set value of of the disk sector
 .bios_alv_a_end:
 
 
+
+disk_dirbuf:
+	ds	128		; scratch directory buffer
+.bios_wboot_stack:		; (ab)use the BDOS directory buffer as a stack during WBOOT
 
 
 
