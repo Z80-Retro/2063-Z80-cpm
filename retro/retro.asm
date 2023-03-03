@@ -597,7 +597,7 @@ endif
 ;include 'rw_nocache.asm'
 ;include 'rw_dmcache.asm'
 
-include 'nhacp.asm'
+include 'disk_nhacp.asm'
 
 
 
