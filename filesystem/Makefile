@@ -13,7 +13,8 @@
 SUBDIRS=\
 	progs/tty \
 	progs/example \
-	progs/tms9118
+	progs/tms9118 \
+	progs/nhacp
 
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
 ALL_DIRS=$(SUBDIRS:%=all-%)
@@ -43,7 +44,7 @@ retro.img: ../retro/retro.bin
 	cpmcp -f z80-retro-2k-8m retro.img ../cpm-2.2/filesystem/* 0:
 	cpmcp -f z80-retro-2k-8m retro.img assemblers/sid/*.com 0:
 	cpmcp -f z80-retro-2k-8m retro.img adventure/* 0:
-	cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0:
+	cpmcp -f z80-retro-2k-8m retro.img progs/*/*.com 0:
 
 local: retro.img
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\

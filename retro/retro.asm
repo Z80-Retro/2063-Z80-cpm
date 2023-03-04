@@ -183,8 +183,8 @@ endif
 	ld	(hl),0
 	ldir
 
-	; Either ensure the stack is in high RAM or disable IRQs to call rw_init!
-	call	rw_init			; initialize anything needed for disk read/write 
+	; Either ensure the stack is in high RAM or disable IRQs to call disk_init!
+	call	disk_init		; initialize anything needed for disk read/write 
 
 	jp	.go_cpm
 
@@ -237,23 +237,19 @@ if .debug >= 2
 	db	"\r\n.bios_wboot entered\r\n\0"
 endif
 
-	; XXX Should not need to reinitialize the cache for a warm boot
-	; Either ensure the stack is in high RAM or disable IRQs to call rw_init!
-	;call	rw_init			; initialize anything needed for disk read/write 
-
 	; reload the CCP and BDOS
 
 	ld	c,0			; C = drive number (0=A)
-	call	.bios_seldsk		; load the OS from drive A
+	call	disk_seldsk		; load the OS from drive A
 
 	ld	bc,.wb_trk		; BC = track number whgere the CCP starts
-	call	.bios_settrk
+	call	disk_settrk
 
 	ld	bc,.wb_sec		; sector where the CCP begins on .wb_trk
-	call	.bios_setsec
+	call	disk_setsec
 
 	ld	bc,CPM_BASE		; starting address to read the OS into
-	call	.bios_setdma
+	call	disk_setdma
 
 	ld	bc,.wb_nsects		; BC = gross number of sectors to read
 .wboot_loop:
@@ -269,33 +265,33 @@ endif
 	db      "\r\n\r\nERROR: WBOOT READ FAILED.  HALTING."
 	db      "\r\n\n*** PRESS RESET TO REBOOT ***\r\n"
 	db      0
-	jp      $               ; endless spin loop
+	jp      $               	; endless spin loop
 
 .wboot_sec_ok:
 	; advance the DMA pointer by 128 bytes
-	ld	hl,(bios_disk_dma)	; HL = the last used DMA address
+	ld	hl,(disk_dma)	; HL = the last used DMA address
 	ld	de,128
 	add	hl,de			; HL += 128
 	ld	b,h
 	ld	c,l			; BC = HL
-	call	.bios_setdma
+	call	disk_setdma
 
 	; increment the sector/track numbers
-	ld	a,(bios_disk_sector)	; A = last used sector number (low byte only for 0..3)
+	ld	a,(disk_sec)		; A = last used sector number (low byte only for 0..3)
 	inc	a
 	and	0x03			; if A+1 = 4 then A=0
 	jr	nz,.wboot_sec		; if A+1 !=4 then do not advance the track number
 
 	; advance to the next track
-	ld	bc,(bios_disk_track)
+	ld	bc,(disk_track)
 	inc	bc
-	call	.bios_settrk
+	call	disk_settrk
 	xor	a			; set A=0 for first sector on new track
 
 .wboot_sec:
 	ld	b,0
 	ld	c,a
-	call	.bios_setsec
+	call	disk_setsec
 
 	pop	bc			; BC = remaining sector counter value
 	dec	bc			; BC -= 1
@@ -317,7 +313,7 @@ endif
 	ld	(6),hl		; address 6 now = JP FBASE
 
 	ld	bc,0x80		; this is here because it is in the example CBIOS (AG p.52)
-	call	.bios_setdma
+	call	disk_setdma
 
 if .debug >= 3
 	; dump the zero-page for reference
@@ -436,6 +432,32 @@ endif
 .bios_reader:
 	ld	a,0x1a
 	ret
+
+;##########################################################################
+; Initialize the console port.  Note that this includes CTC port 1.
+;##########################################################################
+.init_console:
+	;ld	c,6			; C = 6 = 19200 bps
+	ld	c,12			; C = 12 = 9600 bps
+	call	init_ctc_1		; start CTC1 in case J11-A selects it!
+	call	sioa_init		; 115200 or 19200/9600 depending on J11-A
+	ret
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if 0
 
 ;##########################################################################
 ;
@@ -588,20 +610,6 @@ bios_debug_disk:
 	ret
 endif
 
-
-
-
-; Pick the preferred flavor of SD read/write routines.
-
-;include 'rw_stub.asm'
-;include 'rw_nocache.asm'
-;include 'rw_dmcache.asm'
-
-include 'disk_nhacp.asm'
-
-
-
-
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p20:
@@ -620,40 +628,6 @@ include 'disk_nhacp.asm'
 	ld	h,b
 	ld	l,c
 	ret
-
-
-;##########################################################################
-; Initialize the console port.  Note that this includes CTC port 1.
-;##########################################################################
-.init_console:
-	;ld	c,6			; C = 6 = 19200 bps
-	ld	c,12			; C = 12 = 9600 bps
-	call	init_ctc_1		; start CTC1 in case J11-A selects it!
-	call	sioa_init		; 115200 or 19200/9600 depending on J11-A
-	ret
-
-
-
-
-
-;##########################################################################
-; Libraries
-;##########################################################################
-
-include 'sio.asm'
-include 'ctc1.asm'
-include 'puts.asm'
-include 'hexdump.asm'
-include 'sdcard.asm'
-include 'spi.asm'
-include 'prn.asm'
-
-
-;##########################################################################
-; General save areas
-;##########################################################################
-
-gpio_out_cache: ds  1			; GPIO output latch cache
 
 ;##########################################################################
 ; The bios_disk_XXX values are used to retain the most recent values that
@@ -734,6 +708,46 @@ bios_disk_sector:			; last set value of of the disk sector
 .bios_alv_a:
 	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 .bios_alv_a_end:
+
+;##########################################################################
+; Pick the preferred flavor of SD read/write routines.
+;##########################################################################
+
+;include 'rw_stub.asm'
+;include 'rw_nocache.asm'
+include 'rw_dmcache.asm'
+
+;include 'disk_nhacp.asm'
+
+endif
+
+
+
+
+
+
+
+
+;##########################################################################
+; Libraries
+;##########################################################################
+
+include 'disk_callgate.asm'
+
+include 'sio.asm'
+include 'ctc1.asm'
+include 'puts.asm'
+include 'hexdump.asm'
+include 'sdcard.asm'
+include 'spi.asm'
+include 'prn.asm'
+
+
+;##########################################################################
+; General save areas
+;##########################################################################
+
+gpio_out_cache: ds  1			; GPIO output latch cache
 
 
 

@@ -53,11 +53,11 @@
 ; the error, or ctl-C to abort.
 ;
 ;##########################################################################
-bios_read:
+.nocache_read:
 if .rw_debug >= 1
 	call	iputs
 	db	".bios_read entered: \0"
-	call	bios_debug_disk
+	call	disk_dump
 endif
 
 	; switch to a local stack (we only have a few levels when called from the BDOS!)
@@ -70,7 +70,7 @@ endif
 	push	bc			; save the register pairs we will otherwise clobber
 	push	de			; this is not critical but may make WBOOT cleaner later
 
-	ld	hl,(bios_disk_track)	; HL = CP/M track number
+	ld	hl,(disk_track)	; HL = CP/M track number
 
 	; Check to see if the SD block in .bios_sdbuf is already the one we want
 	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
@@ -88,8 +88,8 @@ endif
 .bios_read_block:
 if .rw_debug >= 2
 	call	iputs
-	db	".bios_read cache miss: \0"
-	call	bios_debug_disk
+	db	".nocache_read cache miss: \0"
+	call	disk_dump
 endif
 
 	; Assume all will go well reading the SD card block.
@@ -121,8 +121,8 @@ endif
 
 .bios_read_sd_ok:
 
-	; calculate the CP/M sector offset address (bios_disk_sector*128)
-	ld	hl,(bios_disk_sector)	; must be 0..3
+	; calculate the CP/M sector offset address (disk_sec*128)
+	ld	hl,(disk_sec)	; must be 0..3
 	add	hl,hl			; HL *= 2
 	add	hl,hl			; HL *= 4
 	add	hl,hl			; HL *= 8
@@ -136,7 +136,7 @@ endif
 	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
 
 	; copy the data of interest from the SD block
-	ld	de,(bios_disk_dma)		; target address
+	ld	de,(disk_dma)		; target address
 	ld	bc,0x0080		; number of bytes to copy
 	ldir
 
@@ -180,19 +180,19 @@ endif
 ; the error, or ctl-C to abort.
 ;
 ;##########################################################################
-bios_write:
+.nocache_write:
 
 if .rw_debug >= 1
 	push	bc
 	call	iputs
-	db	".bios_write entered, C=\0"
+	db	".nocache_write entered, C=\0"
 	pop	bc
 	push	bc
 	ld	a,c
 	call	hexdump_a
 	call	iputs
 	db	": \0"
-	call	bios_debug_disk
+	call	disk_dump
 	pop	bc
 endif
 
@@ -206,7 +206,7 @@ endif
 	push	de			; save the register pairs we will otherwise clobber
 	push	bc
 
-	ld	hl,(bios_disk_track)	; HL = CP/M track number
+	ld	hl,(disk_track)	; HL = CP/M track number
 
 	; Check to see if the SD block in .bios_sdbuf is already the one we want
 	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
@@ -276,8 +276,8 @@ endif
 	jp	.bios_write_ret
 
 .bios_write_sdbuf:
-	; calculate the CP/M sector offset address (bios_disk_sector*128)
-	ld	hl,(bios_disk_sector)	; must be 0..3
+	; calculate the CP/M sector offset address (disk_sec*128)
+	ld	hl,(disk_sec)	; must be 0..3
 	add	hl,hl			; HL *= 2
 	add	hl,hl			; HL *= 4
 	add	hl,hl			; HL *= 8
@@ -293,12 +293,12 @@ endif
 	ld	e,l			; DE = @ of cpm sector in the .bios_sdbuf
 
 	; copy the data of interest /into/ the SD block
-	ld	hl,(bios_disk_dma)		; source address
+	ld	hl,(disk_dma)		; source address
 	ld	bc,0x0080		; number of bytes to copy
 	ldir
 
 	; write the .bios_sdbuf contents to the SD card
-	ld      hl,(bios_disk_track)
+	ld      hl,(disk_track)
 	ld	de,.sd_partition_base	; XXX add the starting partition block number
 	add	hl,de			; HL = SD physical block number
 	ld	de,0
@@ -342,7 +342,7 @@ endif
 ;##########################################################################
 ; Called once before library is used.
 ;##########################################################################
-rw_init:
+.nocache_init:
 ;	call	iputs
 ;	db	'NOTICE: rw_nocache library installed. Disk cache disabled.\r\n\0'
 
@@ -350,3 +350,73 @@ rw_init:
 	ld	(.bios_sdbuf_val),a     ; mark .bios_sdbuf_trk as invalid
 
         ret
+
+
+
+
+;##########################################################################
+; Goal: Define a CP/M-compatible filesystem that can be implemented using
+; an SDHC card.  An SDHC card is comprised of a number of 512-byte blocks.
+;
+; Plan:
+; - Put 4 128-byte CP/M sectors into each 512-byte SDHC block.
+; - Treat each SDHC block as a CP/M track.
+;
+; This CP/M filesystem has:
+;  128 bytes/sector (CP/M requirement)
+;  4 sectors/track (Retro BIOS designer's choice)
+;  65536 total sectors (max CP/M limit)
+;  65536*128 = 8388608 gross bytes (max CP/M limit)
+;  65536/4 = 16384 tracks
+;  2048 allocation block size BLS (Retro BIOS designer's choice)
+;  8388608/2048 = 4096 gross allocation blocks in our filesystem
+;  32 = number of reserved tracks to hold the O/S
+;  32*512 = 16384 total reserved track bytes
+;  floor(4096-16384/2048) = 4088 total allocation blocks, absent the reserved tracks
+;  512 directory entries (Retro BIOS designer's choice)
+;  512*32 = 16384 total bytes in the directory
+;  ceiling(16384/2048) = 8 allocation blocks for the directory
+;
+;                  DSM<256   DSM>255
+;  BLS  BSH BLM    ------EXM--------
+;  1024  3    7       0         x
+;  2048  4   15       1         0  <----------------------
+;  4096  5   31       3         1
+;  8192  6   63       7         3
+; 16384  7  127      15         7
+;
+; ** NOTE: This filesystem design is inefficient because it is unlikely
+;          that ALL of the allocation blocks will ultimately get used!
+;
+;##########################################################################
+	
+dmnocache_dph_0:
+	dw	0		; +0 XLT sector translation table (no xlation done)
+	dw	0		; +2 scratchpad
+	dw	0		; +4 scratchpad
+	dw	0		; +6 scratchpad
+	dw	disk_dirbuf	; +8 DIRBUF pointer
+	dw	.sd_dpb		; +10 DPB pointer
+	dw	0		; +12 CSV pointer (optional, not implemented)
+	dw	.sd_alv_0	; +14 ALV pointer
+
+
+	dw	.nocache_init	; .sd_dpb-6
+	dw	.nocache_read	; .sd_dpb-4
+	dw	.nocache_write	; .sd_dpb-2
+.sd_dpb:
+	dw	4		; SPT
+	db	4		; BSH
+	db	15		; BLM
+	db	0		; EXM
+	dw	4087		; DSM (max allocation block number)
+	dw	511		; DRM
+	db	0xff		; AL0
+	db	0x00		; AL1
+	dw	0		; CKS
+	dw	32		; OFF
+
+
+.sd_alv_0:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+

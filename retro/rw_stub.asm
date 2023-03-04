@@ -25,7 +25,7 @@
 ; stubbed in read and write logic for testing a simulated blank read-only disk
 
 
-.rw_debug:		equ	3
+.rw_debug:		equ	0
 
 
 
@@ -45,16 +45,16 @@
 ; the error, or ctl-C to abort.
 ;
 ;##########################################################################
-bios_read:
+.stub_read:
 if .rw_debug >= 1
 	call	iputs
-	db	"bios_read entered: \0"
-	call	bios_debug_disk
+	db	".stub_read entered: \0"
+	call	disk_dump
 endif
 
 	; fake a 'blank'/formatted sector
-	ld	hl,(bios_disk_dma)	; HL = buffer address
-	ld	de,(bios_disk_dma)
+	ld	hl,(disk_dma)		; HL = buffer address
+	ld	de,(disk_dma)
 	inc	de			; DE = buffer address + 1
 	ld	bc,0x007f		; BC = 127
 	ld	(hl),0xe5
@@ -90,19 +90,19 @@ endif
 ; the error, or ctl-C to abort.
 ;
 ;##########################################################################
-bios_write:
+.stub_write:
 
 if .rw_debug >= 1
 	push	bc
 	call	iputs
-	db	"bios_write entered, C=\0"
+	db	".stub_write entered, C=\0"
 	pop	bc
 	push	bc
 	ld	a,c
 	call	hexdump_a
 	call	iputs
 	db	": \0"
-	call	bios_debug_disk
+	call	disk_dump
 	pop	bc
 endif
 	ld	a,1
@@ -113,7 +113,83 @@ endif
 ;##########################################################################
 ; Called once before library is used.
 ;##########################################################################
-rw_init:
+.stub_init:
 	call	iputs
 	db	'NOTICE: rw_stub library installed. All disk I/O disabled.\r\n\0'
 	ret
+
+
+;##########################################################################
+; Define a CP/M-compatible filesystem intended to be network-mounted 
+; using NHACP.
+;
+; This defines the disk as having 1 sector on each track.  This will 
+; allow the track number on its own to represent the sector number to
+; transfer in calls to nhacp_write and nhacp_read.
+;
+; This CP/M filesystem has:
+;  128 bytes/sector (CP/M requirement)
+;  1 sector/track (Retro BIOS designer's choice)
+;  65536 total sectors (max CP/M limit)
+;  65536*128 = 8388608 gross bytes (max CP/M limit)
+;  65536/1 = 65536 tracks
+;  8192 allocation block size BLS (Retro BIOS designer's choice)
+;  8388608/8192 = 1024 gross allocation blocks in our filesystem
+;  0 = number of reserved tracks to hold the O/S
+;  0*128 = 0 total reserved track bytes
+;  floor(1024-0/8192) = 1024 total allocation blocks
+;  512 directory entries (Retro BIOS designer's choice)
+;  512*32 = 16384 total bytes in the directory
+;  ceiling(16384/8192) = 2 allocation blocks for the directory
+;
+;                  DSM<256   DSM>255
+;  BLS  BSH BLM    ------EXM--------
+;  1024  3    7       0         x
+;  2048  4   15       1         0
+;  4096  5   31       3         1
+;  8192  6   63       7         3  <----------------------
+; 16384  7  127      15         7
+;
+;##########################################################################
+stub_dph_0:
+        dw      0               ; XLT sector translation table (no xlation done)
+        dw      0               ; scratchpad
+        dw      0               ; scratchpad
+        dw      0               ; scratchpad
+        dw      disk_dirbuf   	; system-wide, shared DIRBUF pointer
+        dw      .dpb		; DPB pointer
+        dw      0               ; CSV pointer (optional, not implemented)
+        dw      .alv0		; ALV pointer
+
+stub_dph_1:
+        dw      0               ; XLT sector translation table (no xlation done)
+        dw      0               ; scratchpad
+        dw      0               ; scratchpad
+        dw      0               ; scratchpad
+        dw      disk_dirbuf   	; system-wide, shared DIRBUF pointer
+        dw      .dpb		; DPB pointer
+        dw      0               ; CSV pointer (optional, not implemented)
+        dw      .alv1		; ALV pointer
+
+
+
+	dw	.stub_init	; .dpb-6
+	dw	.stub_read	; .dpb-4
+	dw	.stub_write	; .dpb-2
+.dpb:
+        dw      1               ; SPT
+        db      6               ; BSH
+        db      63              ; BLM
+        db      3               ; EXM
+        dw      1023            ; DSM (max allocation block number)
+        dw      511             ; DRM
+        db      0xc0            ; AL0
+        db      0x00            ; AL1
+        dw      0               ; CKS
+        dw      0               ; OFF
+
+.alv0:
+	ds	(1023/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+.alv1:
+	ds	(1023/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+

@@ -298,7 +298,7 @@ endif
 	call	.dm_slt2adr
 	ex	de,hl			; DE = target slot buffer address (HL = garbage)
 
-	; calculate the CP/M sector offset address (bios_disk_sector*128)
+	; calculate the CP/M sector offset address (disk_sec*128)
 	pop	hl			; HL=CP/M sector number, must be 0..3
 	add	hl,hl			; HL *= 2
 	add	hl,hl			; HL *= 4
@@ -644,9 +644,9 @@ endif
 ;************************************************************************
 ; Copy the CP/M sector data from cache into the RAM.
 ;
-; bios_disk_sector = sector in the cache to read from
-; bios_disk_track = track in the cache to read from
-; bios_disk_dma = where to copy the data into
+; disk_sec = sector in the cache to read from
+; disk_track = track in the cache to read from
+; disk_dma = where to copy the data into
 ;
 ; This assumes that it is running with a stack above 0x8000
 ;
@@ -655,7 +655,7 @@ endif
 .copy_cache2ram:
 
 	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
-	ld	hl,(bios_disk_track)
+	ld	hl,(disk_track)
 	call	.dm_trk2slt
 	call	.dm_slt2bnk
 	ld	d,a				; D = bank number in high 4-bits
@@ -677,12 +677,12 @@ if .rw_debug >= 3
 	call	puts_crlf
 endif
 
-	ld	hl,(bios_disk_track)
-	ld	bc,(bios_disk_sector)
+	ld	hl,(disk_track)
+	ld	bc,(disk_sec)
 	call	.dm_trksec2addr			; HL = @ of cpm sector in the cache
 
 	; Copy the CP/M sector data from the cache slot
-	ld	de,(bios_disk_dma)		; DE = CP/M target buffer address
+	ld	de,(disk_dma)		; DE = CP/M target buffer address
 	ld	a,0x7f				; is DE > 0x7fff ?
 	cp	d
 	jp	m,.copy_cache2ramd		; yes? then OK
@@ -709,7 +709,7 @@ endif
 	out     (gpio_out),a
 
 	ld	hl,.dm_bounce_buffer
-	ld	de,(bios_disk_dma)
+	ld	de,(disk_dma)
 
 if .rw_debug >= 3
 	call	iputs
@@ -759,9 +759,9 @@ endif
 ;************************************************************************
 ; Copy the CP/M sector data from RAM into the cache.
 ;
-; bios_disk_sector = sector in the cache to write into
-; bios_disk_track = track in the cache to write into
-; bios_disk_dma = where to copy the data from
+; disk_sec = sector in the cache to write into
+; disk_track = track in the cache to write into
+; disk_dma = where to copy the data from
 ;
 ; This assumes that it is running with a stack above 0x8000
 ;
@@ -769,7 +769,7 @@ endif
 ;************************************************************************
 .copy_ram2cache:
 
-	ld	hl,(bios_disk_dma)		; HL = CP/M target buffer address
+	ld	hl,(disk_dma)		; HL = CP/M target buffer address
 
 if .rw_debug >= 3
 	call	iputs
@@ -816,7 +816,7 @@ endif
 	push	hl				; save for later
 
 	; calculate the proper RAM bank for the given slot we need to use for the CP/M track
-	ld	hl,(bios_disk_track)
+	ld	hl,(disk_track)
 	call	.dm_trk2slt
 	call	.dm_slt2bnk
 	ld	d,a				; D = bank number in high 4-bits
@@ -837,8 +837,8 @@ if .rw_debug >= 3
 	call	hexdump_a
 	call	puts_crlf
 endif
-	ld	hl,(bios_disk_track)
-	ld	bc,(bios_disk_sector)
+	ld	hl,(disk_track)
+	ld	bc,(disk_sec)
 	call	.dm_trksec2addr			; HL = @ of cpm sector in the cache
 
 	ex	de,hl				; DE = @ of target in the cache (and HL = garbage)
@@ -881,11 +881,11 @@ endif
 ; the error, or ctl-C to abort.
 ;
 ;##########################################################################
-bios_read:
+.dmcache_read:
 if .rw_debug >= 1
 	call	iputs
-	db	"bios_read entered: \0"
-	call	bios_debug_disk
+	db	".dmcache_read entered: \0"
+	call	disk_dump
 endif
 
 
@@ -896,7 +896,7 @@ if .rw_debug >= 1
 	call	iputs
 	db	"DM cache slot=\0"
 
-	ld      hl,(bios_disk_track)
+	ld      hl,(disk_track)
 	call	.dm_trk2slt
 
 	ld	a,h
@@ -908,7 +908,7 @@ if .rw_debug >= 1
 	call	iputs
 	db	", bank=\0"
 
-	ld      hl,(bios_disk_track)
+	ld      hl,(disk_track)
 	call	.dm_trk2slt
 	call	.dm_slt2bnk
 
@@ -918,7 +918,7 @@ if .rw_debug >= 1
 	call	iputs
 	db	', address=\0'
 
-	ld      hl,(bios_disk_track)
+	ld      hl,(disk_track)
 	call	.dm_trk2slt
 	call	.dm_slt2adr
 
@@ -933,7 +933,7 @@ if .rw_debug >= 1
 	call	iputs
 	db	', (tag=\0'
 
-	ld	hl,(bios_disk_track)
+	ld	hl,(disk_track)
 	call	.dm_trk2slt		; find the slot for the desired track
 	call	.dm_slt2tag		; get the value of the tag for the slot
 
@@ -944,7 +944,7 @@ if .rw_debug >= 1
 	call	iputs
 	db	', track=\0'
 
-	ld	hl,(bios_disk_track)
+	ld	hl,(disk_track)
 	call	.dm_trk2slt		; find the slot for the desired track
 	call	.dm_slt2trk		; ask what track is currently in that slot
 
@@ -958,7 +958,7 @@ if .rw_debug >= 1
 
 	; Does the slot have the track in it that we are looking for?
 	ex	de,hl			; DE = track number/slot (HL = garbage)
-	ld	hl,(bios_disk_track)
+	ld	hl,(disk_track)
 	or	a			; clear the CY flag
 	sbc	hl,de			; HL = got - want
 	jp	nz,.debug_read_miss
@@ -976,7 +976,7 @@ if .rw_debug >= 1
 	call	iputs
 	db	', new tag=\0'
 
-	ld	hl,(bios_disk_track)
+	ld	hl,(disk_track)
 
 	ld	a,h
 	call	hexdump_a
@@ -998,7 +998,7 @@ endif
 	push	bc			; save the register pairs we will otherwise clobber
 	push	de			; this is not critical but may make WBOOT cleaner later
 
-	ld	hl,(bios_disk_track)	; HL = CP/M track number to read
+	ld	hl,(disk_track)	; HL = CP/M track number to read
 	call	.cache_slot_fill
 	jr	nz,.bios_read_err
 
@@ -1051,12 +1051,12 @@ endif
 ; the error, or ctl-C to abort.
 ;
 ;##########################################################################
-bios_write:
+.dmcache_write:
 
 if .rw_debug >= 1
 	push	bc
 	call	iputs
-	db	"bios_write entered, C=\0"
+	db	".dmcache_write entered, C=\0"
 	pop	bc
 	push	bc
 	ld	a,c
@@ -1085,12 +1085,12 @@ if 0
 	jr	nz,.bios_write_prerd	; if C!=2 then read the sector
 
 	; C==2, no need to read the SD.  Just padd it with 0xe5.
-	ld	hl,(bios_disk_track)	; track to padd
+	ld	hl,(disk_track)	; track to padd
 	call	.cache_slot_padd
 	jp	.bios_write_slot	; go to write logic (skip the SD card pre-read)
 endif
 
-	ld	hl,(bios_disk_track)	; HL = CP/M track number to read
+	ld	hl,(disk_track)	; HL = CP/M track number to read
 	call	.cache_slot_fill
 	jr	z,.bios_write_slot	; If .cache_slot_fill is OK then continue
 
@@ -1107,7 +1107,7 @@ endif
 .bios_write_slot:
 	call	.copy_ram2cache		; copy the write-data into the cache
 
-	ld	hl,(bios_disk_track)	; HL = CP/M track number to write
+	ld	hl,(disk_track)	; HL = CP/M track number to write
 	call	.cache_slot_flush	; flush the cache slot to disk
 	jr	nz,.slot_flush_err	; If .cache_slot_flush failed then return error 
 	xor	a			; tell CP/M the write was OK
@@ -1147,7 +1147,7 @@ endif
 ;
 ; Clobbers: AF, BC, DE, HL
 ;##########################################################################
-rw_init:
+.dmcache_init:
 	call    iputs
 	db      'NOTICE: rw_dmcache library installed.\r\n\0'
 
@@ -1226,3 +1226,71 @@ rw_debug_wedge:
 
 	ret
 endif
+
+
+
+
+;##########################################################################
+; Goal: Define a CP/M-compatible filesystem that can be implemented using
+; an SDHC card.  An SDHC card is comprised of a number of 512-byte blocks.
+;
+; Plan:
+; - Put 4 128-byte CP/M sectors into each 512-byte SDHC block.
+; - Treat each SDHC block as a CP/M track.
+;
+; This CP/M filesystem has:
+;  128 bytes/sector (CP/M requirement)
+;  4 sectors/track (Retro BIOS designer's choice)
+;  65536 total sectors (max CP/M limit)
+;  65536*128 = 8388608 gross bytes (max CP/M limit)
+;  65536/4 = 16384 tracks
+;  2048 allocation block size BLS (Retro BIOS designer's choice)
+;  8388608/2048 = 4096 gross allocation blocks in our filesystem
+;  32 = number of reserved tracks to hold the O/S
+;  32*512 = 16384 total reserved track bytes
+;  floor(4096-16384/2048) = 4088 total allocation blocks, absent the reserved tracks
+;  512 directory entries (Retro BIOS designer's choice)
+;  512*32 = 16384 total bytes in the directory
+;  ceiling(16384/2048) = 8 allocation blocks for the directory
+;
+;                  DSM<256   DSM>255
+;  BLS  BSH BLM    ------EXM--------
+;  1024  3    7       0         x
+;  2048  4   15       1         0  <----------------------
+;  4096  5   31       3         1
+;  8192  6   63       7         3
+; 16384  7  127      15         7
+;
+; ** NOTE: This filesystem design is inefficient because it is unlikely
+;          that ALL of the allocation blocks will ultimately get used!
+;
+;##########################################################################
+dmcache_dph_0:
+	dw	0		; XLT sector translation table (no xlation done)
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	0		; scratchpad
+	dw	disk_dirbuf	; DIRBUF pointer
+	dw	.sd_dpb		; DPB pointer
+	dw	0		; CSV pointer (optional, not implemented)
+	dw	.sd_alv_0	; ALV pointer
+
+
+	dw	.dmcache_init
+	dw	.dmcache_read
+	dw	.dmcache_write
+.sd_dpb:
+	dw	4		; SPT
+	db	4		; BSH
+	db	15		; BLM
+	db	0		; EXM
+	dw	4087		; DSM (max allocation block number)
+	dw	511		; DRM
+	db	0xff		; AL0
+	db	0x00		; AL1
+	dw	0		; CKS
+	dw	32		; OFF
+
+
+.sd_alv_0:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
