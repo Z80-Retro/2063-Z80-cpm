@@ -39,12 +39,12 @@ Currently only disk slots 0-3 are supported by the Z80 Retro. It can support up 
 But, depending on the filesystem format, this can require 8K of RAM (512 byte ALV buffer per drive.)
 We'll be looking more at this issue in the future.
 
-	sudo dd if=0.img of=/dev/YourDriveHere bs=512 seek=00x16384 conv=fsync  # slot 0
-	sudo dd if=1.img of=/dev/YourDriveHere bs=512 seek=01x16384 conv=fsync  # slot 1
-	sudo dd if=2.img of=/dev/YourDriveHere bs=512 seek=02x16384 conv=fsync  # slot 2
-	sudo dd if=3.img of=/dev/YourDriveHere bs=512 seek=03x16384 conv=fsync  # slot 3
+	sudo dd if=0.img of=/dev/YourPartitionHere bs=512 seek=00x16384 conv=fsync  # slot 0
+	sudo dd if=1.img of=/dev/YourPartitionHere bs=512 seek=01x16384 conv=fsync  # slot 1
+	sudo dd if=2.img of=/dev/YourPartitionHere bs=512 seek=02x16384 conv=fsync  # slot 2
+	sudo dd if=3.img of=/dev/YourPartitionHere bs=512 seek=03x16384 conv=fsync  # slot 3
 
-Note that you must replace the `YourDriveHere` with the device representing your SD card.  It is different depending on your system configuration.  On a generic Raspberry PI, it is typically `/dev/sda1`.
+Note that you must replace the `YourPartitionHere` with the disk partition representing your SD card.  It is different depending on your system configuration.  On a generic Raspberry PI, it is typically `/dev/sda1`.
 
 Also note the different `seek` values and filesystem names on each of the above `dd` commands.
 
