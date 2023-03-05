@@ -358,12 +358,12 @@ endif
 ;##########################################################################
 .calc_sd_block:
 	ld	ix,(disk_dph)		; IX = current DPH base address
-	ld	e,(ix-4)		; DE = low-word of the SD starting block
-	ld	d,(ix-3)		; DE = low-word of the SD starting block
+	ld	e,(ix+16)		; DE = low-word of the SD starting block
+	ld	d,(ix+17)		; DE = low-word of the SD starting block
 	add	hl,de
 	push 	hl
-	ld	l,(ix-2)
-	ld	h,(ix-1)
+	ld	l,(ix+18)
+	ld	h,(ix+19)
 	ld	de,0
 	adc	hl,de			; cy flag still set from add hl,de
 	ld	e,l
@@ -435,68 +435,23 @@ endif
 ;          that ALL of the allocation blocks will ultimately get used!
 ;
 ;##########################################################################
-	
-;##########################################################################
-; SD drive 0 starts at 0x00000800 
-;##########################################################################
-	dw	0x0800		; -4	32-bit starting SD card block number
-	dw	0x0000		; -2
-nocache_dph_0:
+
+nocache_dph:	macro	sdblk_hi sdblk_lo
 	dw	0		; +0 XLT sector translation table (no xlation done)
 	dw	0		; +2 scratchpad
 	dw	0		; +4 scratchpad
 	dw	0		; +6 scratchpad
 	dw	disk_dirbuf	; +8 DIRBUF pointer
-	dw	.dpb		; +10 DPB pointer
+	dw	nocache_dpb	; +10 DPB pointer
 	dw	0		; +12 CSV pointer (optional, not implemented)
-	dw	.alv_0		; +14 ALV pointer
+	dw	.alv		; +14 ALV pointer
+	dw	sdblk_lo	; +16	32-bit starting SD card block number
+	dw	sdblk_hi	; +18
 
+.alv:	ds	0
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 
-;##########################################################################
-; SD drive 1 starts at 0x00004800 
-;##########################################################################
-	dw	0x4800		; -4	32-bit starting SD card block number
-	dw	0x0000		; -2
-nocache_dph_1:
-	dw	0		; +0 XLT sector translation table (no xlation done)
-	dw	0		; +2 scratchpad
-	dw	0		; +4 scratchpad
-	dw	0		; +6 scratchpad
-	dw	disk_dirbuf	; +8 DIRBUF pointer
-	dw	.dpb		; +10 DPB pointer
-	dw	0		; +12 CSV pointer (optional, not implemented)
-	dw	.alv_1		; +14 ALV pointer
-
-;##########################################################################
-; SD drive 2 starts at 0x00008800 
-;##########################################################################
-	dw	0x8800		; -4	32-bit starting SD card block number
-	dw	0x0000		; -2
-nocache_dph_2:
-	dw	0		; +0 XLT sector translation table (no xlation done)
-	dw	0		; +2 scratchpad
-	dw	0		; +4 scratchpad
-	dw	0		; +6 scratchpad
-	dw	disk_dirbuf	; +8 DIRBUF pointer
-	dw	.dpb		; +10 DPB pointer
-	dw	0		; +12 CSV pointer (optional, not implemented)
-	dw	.alv_2		; +14 ALV pointer
-
-;##########################################################################
-; SD drive 3 starts at 0x0000c800 
-;##########################################################################
-	dw	0xc800		; -4	32-bit starting SD card block number
-	dw	0x0000		; -2
-nocache_dph_3:
-	dw	0		; +0 XLT sector translation table (no xlation done)
-	dw	0		; +2 scratchpad
-	dw	0		; +4 scratchpad
-	dw	0		; +6 scratchpad
-	dw	disk_dirbuf	; +8 DIRBUF pointer
-	dw	.dpb		; +10 DPB pointer
-	dw	0		; +12 CSV pointer (optional, not implemented)
-	dw	.alv_3		; +14 ALV pointer
-
+	endm
 
 ;##########################################################################
 ; The DPB is shared by all the SD drives.
@@ -504,7 +459,7 @@ nocache_dph_3:
 	dw	.nocache_init	; .sd_dpb-6	pointer to the init function
 	dw	.nocache_read	; .sd_dpb-4	pointer to the read function
 	dw	.nocache_write	; .sd_dpb-2	pointer to the write function
-.dpb:
+nocache_dpb:
 	dw	4		; SPT
 	db	4		; BSH
 	db	15		; BLM
@@ -515,14 +470,4 @@ nocache_dph_3:
 	db	0x00		; AL1
 	dw	0		; CKS
 	dw	32		; OFF
-
-;##########################################################################
-.alv_0:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
-.alv_1:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
-.alv_2:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
-.alv_3:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 

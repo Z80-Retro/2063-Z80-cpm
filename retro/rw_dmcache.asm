@@ -1265,21 +1265,25 @@ endif
 ;          that ALL of the allocation blocks will ultimately get used!
 ;
 ;##########################################################################
-dmcache_dph_0:
+dmcache_dph:	macro
 	dw	0		; XLT sector translation table (no xlation done)
 	dw	0		; scratchpad
 	dw	0		; scratchpad
 	dw	0		; scratchpad
 	dw	disk_dirbuf	; DIRBUF pointer
-	dw	.sd_dpb		; DPB pointer
+	dw	dmcache_dpb	; DPB pointer
 	dw	0		; CSV pointer (optional, not implemented)
-	dw	.sd_alv_0	; ALV pointer
+	dw	.alv		; ALV pointer
+.alv:	ds	0
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+	endm
 
-
+;##########################################################################
+;##########################################################################
 	dw	.dmcache_init
 	dw	.dmcache_read
 	dw	.dmcache_write
-.sd_dpb:
+dmcache_dpb:
 	dw	4		; SPT
 	db	4		; BSH
 	db	15		; BLM
@@ -1292,5 +1296,3 @@ dmcache_dph_0:
 	dw	32		; OFF
 
 
-.sd_alv_0:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info

@@ -364,20 +364,25 @@ disk_dph:
 ; 	Do *NOT* expected to mount the same drive more than one 
 ;	way and expect it to work without corrupting the drive!
 ;****************************************************************************
-.dph_vec:
-;	dw	dmcache_dph_0
-	dw	nocache_dph_0
-	dw	nocache_dph_1
-	dw	nocache_dph_2
-	dw	nocache_dph_3
-;	dw	stub_dph_1
-;	dw	nhacp_dph_0
-;	dw	nhacp_dph_1
-;	dw	nhacp_dph_2
-.dph_vec_num:	equ	($-.dph_vec)/2		; number of configured drives
-
-
 include 'rw_nocache.asm'
 ;include 'rw_dmcache.asm'
 ;include 'rw_stub.asm'
 ;include 'disk_nhacp.asm'
+
+; Create a DPH & ALV for each filesystem 
+.dph0:	nocache_dph     0x0000 0x0800	; SD logical drive 0
+.dph1:	nocache_dph     0x0000 0x4800	; SD logical drive 1
+.dph2:	nocache_dph     0x0000 0x8800	; SD logical drive 2
+.dph3:	nocache_dph     0x0000 0xc800	; SD logical drive 3
+
+;.dph2:	stub_dph	; useful for testing
+;.dph3:	stub_dph
+
+;.dph0:	dmcache_dph	; This is only supports SD logical drive 0 !!
+
+.dph_vec:
+	dw	.dph0
+	dw	.dph1
+	dw	.dph2
+	dw	.dph3
+.dph_vec_num:	equ	($-.dph_vec)/2		; number of configured drives
