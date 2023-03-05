@@ -30,6 +30,8 @@ Sorry I did not think of this before.
 
 A discussion of how to partition an SD card for the Retro! board can be found in [./README-SD.md](./README-SD.md)
 
+Be sure to also read the details on [how to install filesystems onto your SD card](./filesystem/README.md).
+
 ## Boot a Hello World! app from the SD card
 
 See the code in [./hello](./hello) to create a program that will load and run from the SD card.
