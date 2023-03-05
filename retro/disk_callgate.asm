@@ -103,6 +103,8 @@ endif
 	add	hl,bc			; HL = DPH for drive n
 	push	hl
 
+	ld	(disk_dph),hl		; save the current DPH for reference
+
 	; find and make handy the read and write handler pointers
 	push	hl
 	pop	ix			; IX = DPH for drive n
@@ -187,11 +189,12 @@ endif
 
 
 .seldsk_fail:
+	; if the disk select failed, make sure we don't get wierd
 	ld	hl,0
+	ld	(disk_dph),hl
 	ld	(.cur_disk_read),hl
 	ld	(.cur_disk_write),hl
 	ret
-
 
 
 ;****************************************************************************
@@ -267,7 +270,7 @@ endif
 	ld	hl,(.cur_disk_write)
 	ld	a,h
 	or	l
-	jr	nz,.disk_fail
+	jr	z,.disk_fail
 	jp	(hl)			; tail-call the driver
 
 .disk_fail:
@@ -332,13 +335,15 @@ endif
 ; These are global because they are read by the disk drivers.
 ;****************************************************************************
 disk_dma:
-	dw	0
+	dw	0		; The current DMA address
 disk_disk:
-	dw	0
+	dw	0		; The currently selected disk
 disk_track:
-	dw	0
+	dw	0		; The current track
 disk_sec:
-	dw	0	
+	dw	0		; The current sector
+disk_dph:
+	dw	0		; The DPH of the currently selected disk
 
 
 ;****************************************************************************
@@ -361,8 +366,10 @@ disk_sec:
 ;****************************************************************************
 .dph_vec:
 ;	dw	dmcache_dph_0
-	dw	dmnocache_dph_0
-;	dw	dmnocache_dph_1
+	dw	nocache_dph_0
+	dw	nocache_dph_1
+	dw	nocache_dph_2
+	dw	nocache_dph_3
 ;	dw	stub_dph_1
 ;	dw	nhacp_dph_0
 ;	dw	nhacp_dph_1

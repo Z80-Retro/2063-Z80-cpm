@@ -32,11 +32,6 @@
 .rw_debug:		equ	0
 
 
-; XXX This is a hack that won't work unless the disk partition < 0x10000
-; XXX This has the SD card partition offset hardcoded in it!!!
-.sd_partition_base: equ	0x800
-
-
 ;##########################################################################
 ;
 ; CP/M 2.2 Alteration Guide p19:
@@ -72,6 +67,23 @@ endif
 
 	ld	hl,(disk_track)	; HL = CP/M track number
 
+if 0
+	jp	.bios_read_block	; XXX just read the block every time for testing
+else
+	;Check to see if the disk number has changed - Trevor Jacobs - 02-15-2023
+	ld	a,(disk_dph)
+	ld	b,a
+	ld	a,(.disk_dph_last)
+	cp	b
+	jp	nz,.bios_read_block	; not the same, force a new read
+
+	ld	a,(disk_dph+1)
+	ld	b,a
+	ld	a,(.disk_dph_last+1)
+	cp	b
+	jp	nz,.bios_read_block	; not the same, force a new read
+endif
+
 	; Check to see if the SD block in .bios_sdbuf is already the one we want
 	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
 	or	a			; is it a non-zero value?
@@ -91,6 +103,9 @@ if .rw_debug >= 2
 	db	".nocache_read cache miss: \0"
 	call	disk_dump
 endif
+	; Remember drive that is in the cache - Trevor Jacobs - 02-15-2023
+	ld	de,(disk_dph)
+	ld	(.disk_dph_last),de
 
 	; Assume all will go well reading the SD card block.
 	; We only need to touch this if we are going to actually read the SD card.
@@ -98,11 +113,9 @@ endif
 	xor	a			; A = 0
 	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
 
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
+	call	.calc_sd_block		; DE,HL = partition_base + HL
 
 	; push the 32-bit physical SD block number into the stack in little-endian order
-	ld	de,0
 	push	de			; 32-bit SD block number (big end)
 	push	hl			; 32-bit SD block number (little end)
 	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
@@ -208,6 +221,23 @@ endif
 
 	ld	hl,(disk_track)	; HL = CP/M track number
 
+if 0
+	jp	.bios_write_miss	; XXX just read the block every time for testing
+else
+	;Check to see if the disk number has changed - Trevor Jacobs - 02-15-2023
+	ld	a,(disk_dph)
+	ld	b,a
+	ld	a,(.disk_dph_last)
+	cp	b
+	jp	nz,.bios_write_miss	; not the same, force a new read
+
+	ld	a,(disk_dph+1)
+	ld	b,a
+	ld	a,(.disk_dph_last+1)
+	cp	b
+	jp	nz,.bios_write_miss	; not the same, force a new read
+endif
+
 	; Check to see if the SD block in .bios_sdbuf is already the one we want
 	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
 	or	a			; is it a non-zero value?
@@ -227,13 +257,15 @@ if .rw_debug >= 1
 	db	".bios_write cache miss: \0"
 	call	bios_debug_disk
 endif
+	; Remember drive that is in the cache - Trevor Jacobs - 02-15-2023
+	ld	de,(disk_dph)
+	ld	(.disk_dph_last),de
 
 	; Assume all will go well reading the SD card block.
 	; We only need to touch this if we are going to actually read the SD card.
 	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
 	xor	a			; A = 0
 	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
-
 
 	; if C==2 then we are writing into an alloc block (and therefore an SD block) that is not dirty
 	pop	bc			; restore C in case was clobbered above
@@ -252,13 +284,10 @@ endif
 
 .bios_write_prerd:
 	; pre-read the block so we can replace one sector and write it back
-	; XXX This is a hack that won't work unless the disk partition < 0x10000
-	; XXX This has the SD card partition offset hardcoded in it!!!
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
+
+	call	.calc_sd_block		; DE,HL = partition_base + HL
 
 	; push the 32-bit physical SD block number into the stack in little-endian order
-	ld	de,0
 	push	de			; 32-bit SD block number (big end)
 	push	hl			; 32-bit SD block number (little end)
 	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
@@ -299,9 +328,8 @@ endif
 
 	; write the .bios_sdbuf contents to the SD card
 	ld      hl,(disk_track)
-	ld	de,.sd_partition_base	; XXX add the starting partition block number
-	add	hl,de			; HL = SD physical block number
-	ld	de,0
+	call	.calc_sd_block		; DE,HL = partition_base + HL
+
 	push	de			; SD block number to write
 	push	hl
 	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
@@ -329,6 +357,30 @@ endif
 
 
 ;##########################################################################
+; Calculate the address of the SD block, given the CP/M track number
+; in HL and the fact that the currently selected drive's DPH is in 
+; disk_dph.
+; HL = CP/M track number
+; Return: the 32-bit block number in DE,HL
+; Based on proposal from Trevor Jacobs - 02-15-2023
+;##########################################################################
+.calc_sd_block:
+	ld	ix,(disk_dph)		; IX = current DPH base address
+	ld	e,(ix-4)		; DE = low-word of the SD starting block
+	ld	d,(ix-3)		; DE = low-word of the SD starting block
+	add	hl,de
+	push 	hl
+	ld	l,(ix-2)
+	ld	h,(ix-1)
+	ld	de,0
+	adc	hl,de			; cy flag still set from add hl,de
+	ld	e,l
+	ld	d,h
+	pop	hl
+	ret
+
+
+;##########################################################################
 ; A single SD block cache
 ;##########################################################################
 .bios_sdbuf_trk:		; The CP/M track number last left in the .bios_sdbuf
@@ -337,6 +389,8 @@ endif
 	ds	1,0xff		; initial value = INVALID
 .bios_sdbuf:			; scratch area to use for SD block reading and writing
 	ds	512,0xa5	; initial value = garbage
+.disk_dph_last:			; the drive that has a block in the cache
+	dw	0		; an impossible DPH address
 
 
 ;##########################################################################
@@ -390,21 +444,75 @@ endif
 ;
 ;##########################################################################
 	
-dmnocache_dph_0:
+;##########################################################################
+; SD drive 0 starts at 0x00000800 
+;##########################################################################
+	dw	0x0800		; -4	32-bit starting SD card block number
+	dw	0x0000		; -2
+nocache_dph_0:
 	dw	0		; +0 XLT sector translation table (no xlation done)
 	dw	0		; +2 scratchpad
 	dw	0		; +4 scratchpad
 	dw	0		; +6 scratchpad
 	dw	disk_dirbuf	; +8 DIRBUF pointer
-	dw	.sd_dpb		; +10 DPB pointer
+	dw	.dpb		; +10 DPB pointer
 	dw	0		; +12 CSV pointer (optional, not implemented)
-	dw	.sd_alv_0	; +14 ALV pointer
+	dw	.alv_0		; +14 ALV pointer
 
 
-	dw	.nocache_init	; .sd_dpb-6
-	dw	.nocache_read	; .sd_dpb-4
-	dw	.nocache_write	; .sd_dpb-2
-.sd_dpb:
+;##########################################################################
+; SD drive 1 starts at 0x00004800 
+;##########################################################################
+	dw	0x4800		; -4	32-bit starting SD card block number
+	dw	0x0000		; -2
+nocache_dph_1:
+	dw	0		; +0 XLT sector translation table (no xlation done)
+	dw	0		; +2 scratchpad
+	dw	0		; +4 scratchpad
+	dw	0		; +6 scratchpad
+	dw	disk_dirbuf	; +8 DIRBUF pointer
+	dw	.dpb		; +10 DPB pointer
+	dw	0		; +12 CSV pointer (optional, not implemented)
+	dw	.alv_1		; +14 ALV pointer
+
+;##########################################################################
+; SD drive 2 starts at 0x00008800 
+;##########################################################################
+	dw	0x8800		; -4	32-bit starting SD card block number
+	dw	0x0000		; -2
+nocache_dph_2:
+	dw	0		; +0 XLT sector translation table (no xlation done)
+	dw	0		; +2 scratchpad
+	dw	0		; +4 scratchpad
+	dw	0		; +6 scratchpad
+	dw	disk_dirbuf	; +8 DIRBUF pointer
+	dw	.dpb		; +10 DPB pointer
+	dw	0		; +12 CSV pointer (optional, not implemented)
+	dw	.alv_2		; +14 ALV pointer
+
+;##########################################################################
+; SD drive 3 starts at 0x0000c800 
+;##########################################################################
+	dw	0xc800		; -4	32-bit starting SD card block number
+	dw	0x0000		; -2
+nocache_dph_3:
+	dw	0		; +0 XLT sector translation table (no xlation done)
+	dw	0		; +2 scratchpad
+	dw	0		; +4 scratchpad
+	dw	0		; +6 scratchpad
+	dw	disk_dirbuf	; +8 DIRBUF pointer
+	dw	.dpb		; +10 DPB pointer
+	dw	0		; +12 CSV pointer (optional, not implemented)
+	dw	.alv_3		; +14 ALV pointer
+
+
+;##########################################################################
+; The DPB is shared by all the SD drives.
+;##########################################################################
+	dw	.nocache_init	; .sd_dpb-6	pointer to the init function
+	dw	.nocache_read	; .sd_dpb-4	pointer to the read function
+	dw	.nocache_write	; .sd_dpb-2	pointer to the write function
+.dpb:
 	dw	4		; SPT
 	db	4		; BSH
 	db	15		; BLM
@@ -416,7 +524,13 @@ dmnocache_dph_0:
 	dw	0		; CKS
 	dw	32		; OFF
 
-
-.sd_alv_0:
+;##########################################################################
+.alv_0:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+.alv_1:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+.alv_2:
+	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+.alv_3:
 	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 

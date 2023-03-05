@@ -13,7 +13,8 @@
 SUBDIRS=\
 	progs/tty \
 	progs/example \
-	progs/tms9118 \
+	progs/tms9118
+NOTYET=\
 	progs/nhacp
 
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
