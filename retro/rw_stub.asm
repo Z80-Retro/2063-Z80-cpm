@@ -2,7 +2,7 @@
 ;
 ;    Z80 Retro! BIOS 
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2021,2022,2023 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -24,10 +24,7 @@
 
 ; stubbed in read and write logic for testing a simulated blank read-only disk
 
-
-.rw_debug:		equ	0
-
-
+.stub_debug:		equ	0
 
 ;##########################################################################
 ;
@@ -46,7 +43,7 @@
 ;
 ;##########################################################################
 .stub_read:
-if .rw_debug >= 1
+if .stub_debug >= 1
 	call	iputs
 	db	".stub_read entered: \0"
 	call	disk_dump
@@ -92,7 +89,7 @@ endif
 ;##########################################################################
 .stub_write:
 
-if .rw_debug >= 1
+if .stub_debug >= 1
 	push	bc
 	call	iputs
 	db	".stub_write entered, C=\0"
@@ -133,63 +130,53 @@ endif
 ;  65536 total sectors (max CP/M limit)
 ;  65536*128 = 8388608 gross bytes (max CP/M limit)
 ;  65536/1 = 65536 tracks
-;  8192 allocation block size BLS (Retro BIOS designer's choice)
-;  8388608/8192 = 1024 gross allocation blocks in our filesystem
+;  16384 allocation block size BLS (Retro BIOS designer's choice)
+;  8388608/16384 = 512 gross allocation blocks in our filesystem
 ;  0 = number of reserved tracks to hold the O/S
 ;  0*128 = 0 total reserved track bytes
-;  floor(1024-0/8192) = 1024 total allocation blocks
+;  floor(1024-0/16384) = 512 total allocation blocks
 ;  512 directory entries (Retro BIOS designer's choice)
 ;  512*32 = 16384 total bytes in the directory
-;  ceiling(16384/8192) = 2 allocation blocks for the directory
+;  ceiling(16384/16384) = 1 allocation blocks for the directory
 ;
 ;                  DSM<256   DSM>255
 ;  BLS  BSH BLM    ------EXM--------
 ;  1024  3    7       0         x
 ;  2048  4   15       1         0
 ;  4096  5   31       3         1
-;  8192  6   63       7         3  <----------------------
-; 16384  7  127      15         7
+;  8192  6   63       7         3 
+; 16384  7  127      15         7  <----------------------
 ;
 ;##########################################################################
-stub_dph_0:
+stub_dph:	macro
         dw      0               ; XLT sector translation table (no xlation done)
         dw      0               ; scratchpad
         dw      0               ; scratchpad
         dw      0               ; scratchpad
         dw      disk_dirbuf   	; system-wide, shared DIRBUF pointer
-        dw      .dpb		; DPB pointer
+        dw      stub_dpb	; DPB pointer
         dw      0               ; CSV pointer (optional, not implemented)
-        dw      .alv0		; ALV pointer
-
-stub_dph_1:
-        dw      0               ; XLT sector translation table (no xlation done)
-        dw      0               ; scratchpad
-        dw      0               ; scratchpad
-        dw      0               ; scratchpad
-        dw      disk_dirbuf   	; system-wide, shared DIRBUF pointer
-        dw      .dpb		; DPB pointer
-        dw      0               ; CSV pointer (optional, not implemented)
-        dw      .alv1		; ALV pointer
+        dw      .alv		; ALV pointer
+.alv:	ds	0
+	ds	(512/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+	endm
 
 
-
+;##########################################################################
+;##########################################################################
 	dw	.stub_init	; .dpb-6
 	dw	.stub_read	; .dpb-4
 	dw	.stub_write	; .dpb-2
-.dpb:
-        dw      1               ; SPT
-        db      6               ; BSH
-        db      63              ; BLM
-        db      3               ; EXM
-        dw      1023            ; DSM (max allocation block number)
+stub_dpb:
+        dw      1		; SPT
+        db      7		; BSH
+        db      127		; BLM
+        db      7		; EXM
+        dw      512		; DSM (max allocation block number)
         dw      511             ; DRM
-        db      0xc0            ; AL0
+        db      0x80            ; AL0
         db      0x00            ; AL1
         dw      0               ; CKS
         dw      0               ; OFF
 
-.alv0:
-	ds	(1023/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
-.alv1:
-	ds	(1023/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 
