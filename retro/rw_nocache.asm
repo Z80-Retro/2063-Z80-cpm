@@ -2,7 +2,7 @@
 ;
 ;    Z80 Retro! BIOS 
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2021,2022,2023 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -23,13 +23,13 @@
 
 
 ;##########################################################################
-; set .rw_debug to:
+; set .nc_debug to:
 ;    0 = no debug output
 ;    1 = print messages from new code under development
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-.rw_debug:		equ	0
+.nc_debug:		equ	0
 
 
 ;##########################################################################
@@ -49,9 +49,9 @@
 ;
 ;##########################################################################
 .nocache_read:
-if .rw_debug >= 1
+if .nc_debug >= 1
 	call	iputs
-	db	".bios_read entered: \0"
+	db	".nocache_read entered: \0"
 	call	disk_dump
 endif
 
@@ -67,38 +67,34 @@ endif
 
 	ld	hl,(disk_track)	; HL = CP/M track number
 
-if 0
-	jp	.bios_read_block	; XXX just read the block every time for testing
-else
 	;Check to see if the disk number has changed - Trevor Jacobs - 02-15-2023
 	ld	a,(disk_dph)
 	ld	b,a
 	ld	a,(.disk_dph_last)
 	cp	b
-	jp	nz,.bios_read_block	; not the same, force a new read
+	jp	nz,.read_block		; not the same, force a new read
 
 	ld	a,(disk_dph+1)
 	ld	b,a
 	ld	a,(.disk_dph_last+1)
 	cp	b
-	jp	nz,.bios_read_block	; not the same, force a new read
-endif
+	jp	nz,.read_block		; not the same, force a new read
 
-	; Check to see if the SD block in .bios_sdbuf is already the one we want
-	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
+	; Check to see if the SD block in .sdbuf is already the one we want
+	ld	a,(.sdbuf_val)		; get the .sdbuf valid flag
 	or	a			; is it a non-zero value?
-	jr	nz,.bios_read_block	; block buffer is invalid, read the SD block
+	jr	nz,.read_block		; block buffer is invalid, read the SD block
 
-	ld	a,(.bios_sdbuf_trk)	; A = CP/M track LSB
+	ld	a,(.sdbuf_trk)		; A = CP/M track LSB
 	cp	l			; is it the one we want?
-	jr	nz,.bios_read_block	; LSB does not match, read the SD block
+	jr	nz,.read_block		; LSB does not match, read the SD block
 
-	ld	a,(.bios_sdbuf_trk+1)	; A = CP/M track MSB
+	ld	a,(.sdbuf_trk+1)	; A = CP/M track MSB
 	cp	h			; is it the one we want?
-	jr	z,.bios_read_sd_ok	; The SD block in .bios_sdbuf is the one we want!
+	jr	z,.read_sd_ok		; The SD block in .sdbuf is the one we want!
 
-.bios_read_block:
-if .rw_debug >= 2
+.read_block:
+if .nc_debug >= 2
 	call	iputs
 	db	".nocache_read cache miss: \0"
 	call	disk_dump
@@ -109,33 +105,33 @@ endif
 
 	; Assume all will go well reading the SD card block.
 	; We only need to touch this if we are going to actually read the SD card.
-	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
+	ld	(.sdbuf_trk),hl		; store the current CP/M track number in the .sdbuf
 	xor	a			; A = 0
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
+	ld	(.sdbuf_val),a		; mark the .sdbuf as valid
 
 	call	.calc_sd_block		; DE,HL = partition_base + HL
 
 	; push the 32-bit physical SD block number into the stack in little-endian order
 	push	de			; 32-bit SD block number (big end)
 	push	hl			; 32-bit SD block number (little end)
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
+	ld	de,.sdbuf		; DE = target buffer to read the 512-byte block
 	call	sd_cmd17		; read the SD block
 	pop	hl			; clean the SD block number from the stack
 	pop	de
 
 	or	a			; was the SD driver read OK?
-	jr	z,.bios_read_sd_ok
+	jr	z,.read_sd_ok
 
 	call	iputs
 	db	"BIOS_READ FAILED!\r\n\0"
 	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
-	jp	.bios_read_ret
+	ld	(.sdbuf_val),a		; mark the .sdbuf as invalid
+	jp	.read_ret
 
-.bios_read_sd_ok:
+.read_sd_ok:
 
 	; calculate the CP/M sector offset address (disk_sec*128)
-	ld	hl,(disk_sec)	; must be 0..3
+	ld	hl,(disk_sec)		; must be 0..3
 	add	hl,hl			; HL *= 2
 	add	hl,hl			; HL *= 4
 	add	hl,hl			; HL *= 8
@@ -144,9 +140,9 @@ endif
 	add	hl,hl			; HL *= 64
 	add	hl,hl			; HL *= 128
 
-	; calculate the address of the CP/M sector in the .bios_sdbuf
-	ld	bc,.bios_sdbuf
-	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
+	; calculate the address of the CP/M sector in the .sdbuf
+	ld	bc,.sdbuf
+	add	hl,bc			; HL = @ of cpm sector in the .sdbuf
 
 	; copy the data of interest from the SD block
 	ld	de,(disk_dma)		; target address
@@ -155,7 +151,7 @@ endif
 
 	xor	a			; A = 0 = read OK
 
-.bios_read_ret:
+.read_ret:
 	pop	de			; restore saved regs
 	pop	bc
 
@@ -195,7 +191,7 @@ endif
 ;##########################################################################
 .nocache_write:
 
-if .rw_debug >= 1
+if .nc_debug >= 1
 	push	bc
 	call	iputs
 	db	".nocache_write entered, C=\0"
@@ -219,42 +215,38 @@ endif
 	push	de			; save the register pairs we will otherwise clobber
 	push	bc
 
-	ld	hl,(disk_track)	; HL = CP/M track number
+	ld	hl,(disk_track)		; HL = CP/M track number
 
-if 0
-	jp	.bios_write_miss	; XXX just read the block every time for testing
-else
 	;Check to see if the disk number has changed - Trevor Jacobs - 02-15-2023
 	ld	a,(disk_dph)
 	ld	b,a
 	ld	a,(.disk_dph_last)
 	cp	b
-	jp	nz,.bios_write_miss	; not the same, force a new read
+	jp	nz,.write_miss		; not the same, force a new read
 
 	ld	a,(disk_dph+1)
 	ld	b,a
 	ld	a,(.disk_dph_last+1)
 	cp	b
-	jp	nz,.bios_write_miss	; not the same, force a new read
-endif
+	jp	nz,.write_miss		; not the same, force a new read
 
-	; Check to see if the SD block in .bios_sdbuf is already the one we want
-	ld	a,(.bios_sdbuf_val)	; get the .bios_sdbuf valid flag
+	; Check to see if the SD block in .sdbuf is already the one we want
+	ld	a,(.sdbuf_val)		; get the .sdbuf valid flag
 	or	a			; is it a non-zero value?
-	jr	nz,.bios_write_miss	; block buffer is invalid, pre-read the SD block
+	jr	nz,.write_miss		; block buffer is invalid, pre-read the SD block
 
-	ld	a,(.bios_sdbuf_trk)	; A = CP/M track LSB
+	ld	a,(.sdbuf_trk)		; A = CP/M track LSB
 	cp	l			; is it the one we want?
-	jr	nz,.bios_write_miss	; LSB does not match, pre-read the SD block
+	jr	nz,.write_miss		; LSB does not match, pre-read the SD block
 
-	ld	a,(.bios_sdbuf_trk+1)	; A = CP/M track MSB
+	ld	a,(.sdbuf_trk+1)	; A = CP/M track MSB
 	cp	h			; is it the one we want?
-	jp	z,.bios_write_sdbuf	; The SD block in .bios_sdbuf is the one we want!
+	jp	z,.write_sdbuf		; The SD block in .sdbuf is the one we want!
 
-.bios_write_miss:
-if .rw_debug >= 1
+.write_miss:
+if .nc_debug >= 1
 	call	iputs
-	db	".bios_write cache miss: \0"
+	db	".write cache miss: \0"
 	call	bios_debug_disk
 endif
 	; Remember drive that is in the cache - Trevor Jacobs - 02-15-2023
@@ -263,26 +255,26 @@ endif
 
 	; Assume all will go well reading the SD card block.
 	; We only need to touch this if we are going to actually read the SD card.
-	ld	(.bios_sdbuf_trk),hl	; store the current CP/M track number in the .bios_sdbuf
+	ld	(.sdbuf_trk),hl		; store the current CP/M track number in the .sdbuf
 	xor	a			; A = 0
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as valid
+	ld	(.sdbuf_val),a		; mark the .sdbuf as valid
 
 	; if C==2 then we are writing into an alloc block (and therefore an SD block) that is not dirty
 	pop	bc			; restore C in case was clobbered above
 	push	bc
 	ld	a,2
 	cp	c
-	jr	nz,.bios_write_prerd
+	jr	nz,.write_prerd
 
 	; padd the SD buffer with all 0xe5
-	ld	hl,.bios_sdbuf		; buffer to initialize
-	ld	de,.bios_sdbuf+1	; buffer+1
+	ld	hl,.sdbuf		; buffer to initialize
+	ld	de,.sdbuf+1		; buffer+1
 	ld	bc,0x1ff		; number of bytes to initialize
 	ld	(hl),0xe5		; set the first byte to 0xe5
 	ldir				; set the rest of the bytes to 0xe5
-	jp	.bios_write_sdbuf	; go to write logic (skip the SD card pre-read)
+	jp	.write_sdbuf		; go to write logic (skip the SD card pre-read)
 
-.bios_write_prerd:
+.write_prerd:
 	; pre-read the block so we can replace one sector and write it back
 
 	call	.calc_sd_block		; DE,HL = partition_base + HL
@@ -290,23 +282,23 @@ endif
 	; push the 32-bit physical SD block number into the stack in little-endian order
 	push	de			; 32-bit SD block number (big end)
 	push	hl			; 32-bit SD block number (little end)
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
+	ld	de,.sdbuf		; DE = target buffer to read the 512-byte block
 	call	sd_cmd17		; pre-read the SD block
 	pop	hl			; clean the SD block number from the stack
 	pop	de
 
 	or	a			; was the SD driver read OK?
-	jr	z,.bios_write_sdbuf
+	jr	z,.write_sdbuf
 
 	call	iputs
 	db	"BIOS_WRITE SD CARD PRE-READ FAILED!\r\n\0"
 	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
-	jp	.bios_write_ret
+	ld	(.sdbuf_val),a		; mark the .sdbuf as invalid
+	jp	.write_ret
 
-.bios_write_sdbuf:
+.write_sdbuf:
 	; calculate the CP/M sector offset address (disk_sec*128)
-	ld	hl,(disk_sec)	; must be 0..3
+	ld	hl,(disk_sec)		; must be 0..3
 	add	hl,hl			; HL *= 2
 	add	hl,hl			; HL *= 4
 	add	hl,hl			; HL *= 8
@@ -315,37 +307,37 @@ endif
 	add	hl,hl			; HL *= 64
 	add	hl,hl			; HL *= 128
 
-	; calculate the address of the CP/M sector in the .bios_sdbuf
-	ld	bc,.bios_sdbuf
-	add	hl,bc			; HL = @ of cpm sector in the .bios_sdbuf
+	; calculate the address of the CP/M sector in the .sdbuf
+	ld	bc,.sdbuf
+	add	hl,bc			; HL = @ of cpm sector in the .sdbuf
 	ld	d,h
-	ld	e,l			; DE = @ of cpm sector in the .bios_sdbuf
+	ld	e,l			; DE = @ of cpm sector in the .sdbuf
 
 	; copy the data of interest /into/ the SD block
 	ld	hl,(disk_dma)		; source address
 	ld	bc,0x0080		; number of bytes to copy
 	ldir
 
-	; write the .bios_sdbuf contents to the SD card
+	; write the .sdbuf contents to the SD card
 	ld      hl,(disk_track)
 	call	.calc_sd_block		; DE,HL = partition_base + HL
 
 	push	de			; SD block number to write
 	push	hl
-	ld	de,.bios_sdbuf		; DE = target buffer to read the 512-byte block
+	ld	de,.sdbuf		; DE = target buffer to read the 512-byte block
 	call	sd_cmd24		; write the SD block
 	pop	hl			; clean the SD block number from the stack
 	pop	de
 
 	or	a
-	jr	z,.bios_write_ret
+	jr	z,.write_ret
 
 	call	iputs
 	db	"BIOS_WRITE SD CARD WRITE FAILED!\r\n\0"
 	ld	a,1			; tell CP/M the read failed
-	ld	(.bios_sdbuf_val),a	; mark the .bios_sdbuf as invalid
+	ld	(.sdbuf_val),a		; mark the .sdbuf as invalid
 
-.bios_write_ret:
+.write_ret:
 	pop	bc
 	pop	de			; restore saved regs
 
@@ -383,11 +375,11 @@ endif
 ;##########################################################################
 ; A single SD block cache
 ;##########################################################################
-.bios_sdbuf_trk:		; The CP/M track number last left in the .bios_sdbuf
+.sdbuf_trk:			; The CP/M track number last left in the .sdbuf
 	ds	2,0xff		; initial value = garbage
-.bios_sdbuf_val:		; The CP/M track number in .bios_sdbuf_trk is valid when this is 0
+.sdbuf_val:			; The CP/M track number in .sdbuf_trk is valid when this is 0
 	ds	1,0xff		; initial value = INVALID
-.bios_sdbuf:			; scratch area to use for SD block reading and writing
+.sdbuf:				; scratch area to use for SD block reading and writing
 	ds	512,0xa5	; initial value = garbage
 .disk_dph_last:			; the drive that has a block in the cache
 	dw	0		; an impossible DPH address
@@ -401,7 +393,7 @@ endif
 ;	db	'NOTICE: rw_nocache library installed. Disk cache disabled.\r\n\0'
 
 	ld	a,1
-	ld	(.bios_sdbuf_val),a     ; mark .bios_sdbuf_trk as invalid
+	ld	(.sdbuf_val),a	; mark .sdbuf_trk as invalid
 
         ret
 
