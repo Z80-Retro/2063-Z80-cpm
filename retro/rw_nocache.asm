@@ -131,14 +131,12 @@ endif
 .read_sd_ok:
 
 	; calculate the CP/M sector offset address (disk_sec*128)
-	ld	hl,(disk_sec)		; must be 0..3
-	add	hl,hl			; HL *= 2
-	add	hl,hl			; HL *= 4
-	add	hl,hl			; HL *= 8
-	add	hl,hl			; HL *= 16
-	add	hl,hl			; HL *= 32
-	add	hl,hl			; HL *= 64
-	add	hl,hl			; HL *= 128
+	xor	a			;clear a, clear carry
+	ld	l,a
+	ld	a,(disk_sec)		; must be less than 16
+	rra				; divide a by 2, remainder into carry
+	rr	l			; carry into l
+	ld	h,a			; HL = A*128
 
 	; calculate the address of the CP/M sector in the .sdbuf
 	ld	bc,.sdbuf
@@ -298,14 +296,12 @@ endif
 
 .write_sdbuf:
 	; calculate the CP/M sector offset address (disk_sec*128)
-	ld	hl,(disk_sec)		; must be 0..3
-	add	hl,hl			; HL *= 2
-	add	hl,hl			; HL *= 4
-	add	hl,hl			; HL *= 8
-	add	hl,hl			; HL *= 16
-	add	hl,hl			; HL *= 32
-	add	hl,hl			; HL *= 64
-	add	hl,hl			; HL *= 128
+	xor	a			;clear a, clear carry
+	ld	l,a
+	ld	a,(disk_sec)		; must be less than 16
+	rra				; divide a by 2, remainder into carry
+	rr	l			; carry into l
+	ld	h,a			; HL = A*128
 
 	; calculate the address of the CP/M sector in the .sdbuf
 	ld	bc,.sdbuf
