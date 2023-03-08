@@ -333,7 +333,7 @@ endif
 disk_dma:
 	dw	0		; The current DMA address
 disk_disk:
-	dw	0		; The currently selected disk
+	db	0		; The currently selected disk (only 8-bits used for this one!)
 disk_track:
 	dw	0		; The current track
 disk_sec:
