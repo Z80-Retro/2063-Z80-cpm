@@ -43,10 +43,6 @@ endif
 	ld	l,(iy+0)
 	ld	h,(iy+1)		; HL = dph[0]
 
-	ld	a,h
-	or	l
-	ret	z			; if HL = 0 then we are done
-
 	push	hl
 	pop	ix			; IX = dph[0]
 
