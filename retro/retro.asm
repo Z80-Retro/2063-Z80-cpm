@@ -117,20 +117,6 @@ WRITE:  JP      disk_write
 PRSTAT: JP      .bios_prstat
 SECTRN: JP      disk_sectrn
 
-if 0
-HOME:   JP      .bios_home
-SELDSK: JP      .bios_seldsk
-SETTRK: JP      .bios_settrk
-SETSEC: JP      .bios_setsec
-SETDMA: JP      .bios_setdma
-READ:   JP      bios_read
-WRITE:  JP      bios_write
-PRSTAT: JP      .bios_prstat
-SECTRN: JP      .bios_sectrn
-endif
-
-
-
 
 ;##########################################################################
 ;
