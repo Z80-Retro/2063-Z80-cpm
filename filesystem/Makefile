@@ -4,8 +4,21 @@
 # To create an image with CP/M distro plus adventure:
 # make retro.img
 #
-# To create an image with CP/M distro plus adventure and local additions:
-# make local
+# To create an image of files for drive B: with local additions:
+# make drive-b.img
+#
+# To erase an SD card to prepare it for use:
+# make blank-all-sd
+#
+# To copy the CP/M files onto drive A:
+# make burn
+#
+# To copy the local files onto drive B:
+# make burn-b
+#
+#
+# This is where the adventure game files came from:
+# wget -P adventure https://ifarchive.org/if-archive/games/cpm/cpm-advent.zip 
 #
 # To list the files that are in the created image:
 # make lsimg
@@ -20,7 +33,7 @@ NOTYET=\
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
 ALL_DIRS=$(SUBDIRS:%=all-%)
 
-.PHONY: all clean $(CLEAN_DIRS) $(ALL_DIRS)
+.PHONY: all clean $(CLEAN_DIRS) $(ALL_DIRS) burn burn-b blank-all-sd
 
 all:: $(ALL_DIRS)
 
@@ -40,35 +53,33 @@ DISKDEF=z80-retro-8k-8m
 #DISKDEF=z80-retro-16k-8m
 
 
-all:: retro.img
+all:: retro.img drive-b.img
 
 retro.img: ../retro/retro.bin 
-	rm -f retro.img
-	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin retro.img
-	cpmcp -f $(DISKDEF) retro.img ../cpm-2.2/filesystem/* 0:
-	cpmcp -f $(DISKDEF) retro.img assemblers/sid/*.com 0:
-	cpmcp -f $(DISKDEF) retro.img adventure/* 0:
-	cpmcp -f $(DISKDEF) retro.img progs/*/*.com 0:
+	rm -f $@
+	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin $@
+	cpmcp -f $(DISKDEF) $@ ../cpm-2.2/filesystem/* 0:
+	cpmcp -f $(DISKDEF) $@ assemblers/sid/*.com 0:
+	cpmcp -f $(DISKDEF) $@ adventure/* 0:
 
-local: retro.img
+drive-b.img:
+	rm -f $@
+	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin $@
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f $(DISKDEF) retro.img local/*/*/* 0: ; \
+		cpmcp -f $(DISKDEF) $@ local/*/*/* 0: ; \
 	fi
 	if [ `ls -1 progs/*/*.com 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f $(DISKDEF) retro.img progs/*/*.com 0: ; \
+		cpmcp -f $(DISKDEF) $@ progs/*/*.com 0: ; \
 	fi
 	if [ `ls -1 progs/*/*.bas 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f $(DISKDEF) retro.img progs/*/*.bas 0: ; \
+		cpmcp -f $(DISKDEF) $@ progs/*/*.bas 0: ; \
 	fi
 
 
-# this is where the adventure game files came from:
-adventure/cpm-advent.zip:
-	wget -P adventure https://ifarchive.org/if-archive/games/cpm/cpm-advent.zip 
 
 
 clean::
-	rm -f retro.img 
+	rm -f retro.img drive-b.img
 
 
 # For normal use on a plain Raspberry PI
@@ -79,6 +90,15 @@ burn: retro.img
 		sudo dd if=retro.img of=/dev/$(SD_DEV) bs=512; \
 	elif [ `hostname` = "x570.winans.org" ]; then \
 		sudo dd if=retro.img of=/dev/sdc1 bs=512; \
+	else \
+		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
+	fi
+
+burn-b: drive-b.img
+	if [ `hostname` = "raspberrypi" ]; then\
+		sudo dd if=$< of=/dev/$(SD_DEV) bs=512 seek=01x16384 conv=fsync; \
+	elif [ `hostname` = "x570.winans.org" ]; then \
+		sudo dd if=$< of=/dev/sdc1 bs=512 seek=01x16384 conv=fsync; \
 	else \
 		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
 	fi
@@ -97,3 +117,4 @@ blank-all-sd: retro.img
 
 lsimg: retro.img
 	cpmls -f $(DISKDEF) retro.img 
+	cpmls -f $(DISKDEF) drive-b.img 
