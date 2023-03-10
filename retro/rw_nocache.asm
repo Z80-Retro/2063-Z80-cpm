@@ -480,7 +480,7 @@ else
 ;
 ; This CP/M filesystem has:
 ;  128 bytes/sector (CP/M requirement)
-;  1 sector/track (Retro BIOS designer's choice)
+;  4 sector/track (Retro BIOS designer's choice)
 ;  65536 total sectors (max CP/M limit)
 ;  65536*128 = 8388608 gross bytes (max CP/M limit)
 ;  65536/1 = 65536 tracks
@@ -525,7 +525,7 @@ nocache_dph:	macro sdblk_hi sdblk_lo
 	dw	.nocache_read	; .sd_dpb-4	pointer to the read function
 	dw	.nocache_write	; .sd_dpb-2	pointer to the write function
 nocache_dpb:
-        dw      1		; SPT
+        dw      4		; SPT
         db      7		; BSH
         db      127		; BLM
         db      7		; EXM
