@@ -2,10 +2,10 @@
 # sample downloads like adventure.
 #
 # To create an image with CP/M distro plus adventure:
-# make retro.img
+# make drive-0.img
 #
 # To create an image of files for drive B: with local additions:
-# make drive-b.img
+# make drive-1.img
 #
 # To erase an SD card to prepare it for use:
 # make blank-all-sd
@@ -23,12 +23,22 @@
 # To list the files that are in the created image:
 # make lsimg
 
-SUBDIRS=\
+
+# Make 'all' first so that it is THE default target.
+# The :: means that more than one of the same target name is same as one big one.
+
+all::
+
+# optionally include rules from a local file:
+-include Make.local
+
+
+
+
+SUBDIRS+=\
 	progs/tty \
 	progs/example \
 	progs/tms9118
-NOTYET=\
-	progs/nhacp
 
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
 ALL_DIRS=$(SUBDIRS:%=all-%)
@@ -53,16 +63,16 @@ DISKDEF=z80-retro-8k-8m
 #DISKDEF=z80-retro-16k-8m
 
 
-all:: retro.img drive-b.img
+all:: drive-0.img drive-1.img
 
-retro.img: ../retro/retro.bin 
+drive-0.img: ../retro/retro.bin 
 	rm -f $@
 	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin $@
 	cpmcp -f $(DISKDEF) $@ ../cpm-2.2/filesystem/* 0:
 	cpmcp -f $(DISKDEF) $@ assemblers/sid/*.com 0:
 	cpmcp -f $(DISKDEF) $@ adventure/* 0:
 
-drive-b.img:
+drive-1.img:
 	rm -f $@
 	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin $@
 	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
@@ -76,45 +86,39 @@ drive-b.img:
 	fi
 
 
-
-
 clean::
-	rm -f retro.img drive-b.img
+	rm -f drive-0.img drive-1.img
 
 
 # For normal use on a plain Raspberry PI
 SD_DEV=sda1
 
-burn: retro.img
+burn: drive-0.img
 	if [ `hostname` = "raspberrypi" ]; then\
-		sudo dd if=retro.img of=/dev/$(SD_DEV) bs=512; \
-	elif [ `hostname` = "x570.winans.org" ]; then \
-		sudo dd if=retro.img of=/dev/sdc1 bs=512; \
+		sudo dd if=$< of=/dev/$(SD_DEV) bs=512; conv=fsync; \
 	else \
 		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
 	fi
 
-burn-b: drive-b.img
+burn-b: drive-1.img
 	if [ `hostname` = "raspberrypi" ]; then\
 		sudo dd if=$< of=/dev/$(SD_DEV) bs=512 seek=01x16384 conv=fsync; \
-	elif [ `hostname` = "x570.winans.org" ]; then \
-		sudo dd if=$< of=/dev/sdc1 bs=512 seek=01x16384 conv=fsync; \
 	else \
 		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
 	fi
 
 # Erase ALL the CP/M drives on the SD card.  *** VERY DANGEROUS ***
 # Write 16*8M of 0xE5 bytes into the CP/M partition on the SD card
-blank-all-sd: retro.img
+blank-all-sd: 
 	if [ `hostname` = "raspberrypi" ]; then \
 		LC_CTYPE=C tr '\0' '\345' < /dev/zero | sudo dd of=/dev/$(SD_DEV) bs=8M count=16 conv=fsync iflag=fullblock ; \
-	elif [ `hostname` = "x570.winans.org" ]; then \
-		LC_CTYPE=C tr '\0' '\345' < /dev/zero | sudo dd of=/dev/sdc1 bs=8M count=16 conv=fsync iflag=fullblock ; \
 	else \
 		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
 	fi
 
 
-lsimg: retro.img
-	cpmls -f $(DISKDEF) retro.img 
-	cpmls -f $(DISKDEF) drive-b.img 
+ls:: drive-0.img drive-1.img
+	cpmls -f $(DISKDEF) drive-0.img 
+	cpmls -f $(DISKDEF) drive-1.img 
+
+
