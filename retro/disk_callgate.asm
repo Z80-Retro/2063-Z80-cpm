@@ -37,8 +37,8 @@ if .disk_debug >= 1
         call    disk_dump
 endif
 
-	ld	iy,.dph_vec		; IY = &.dph_vec
-	ld	b,.dph_vec_num		; count to initialize
+	ld	iy,dph_vec		; IY = &dph_vec
+	ld	b,dph_vec_num		; count to initialize
 .init_loop:
 	ld	l,(iy+0)
 	ld	h,(iy+1)		; HL = dph[0]
@@ -83,11 +83,11 @@ if .disk_debug >= 2
 	ld	a,(disk_disk)		; restore the drive number
 endif
 	; check if the disk is valid
-	cp	.dph_vec_num
-	jr	nc,.seldsk_fail		; if (a >= .dph_vec_num) then error
+	cp	dph_vec_num
+	jr	nc,.seldsk_fail		; if (a >= dph_vec_num) then error
 
 	; disk is valid, find the DPH
-	ld	hl,.dph_vec		; default = invalid
+	ld	hl,dph_vec		; default = invalid
 	sla	a			; A = A * 2
 	ld	c,a
 	ld	b,0
@@ -353,69 +353,4 @@ disk_dph:
 .cur_disk_write:
 	dw	0
 
-;****************************************************************************
-; Configure the BIOS drive DPH structures here.
-;
-; WARNING
-; 	Do *NOT* expected to mount the same drive more than one 
-;	way and expect it to work without corrupting the drive!
-;****************************************************************************
-include 'rw_nocache.asm'
-;include 'rw_dmcache.asm'
-;include 'rw_stub.asm'
-;include 'disk_nhacp.asm'
-
-; Create a DPH & ALV for each filesystem 
-.dph0:	nocache_dph     0x0000 0x0800	; SD logical drive 0  A:
-.dph1:	nocache_dph     0x0000 0x4800	; SD logical drive 1  B:
-.dph2:	nocache_dph     0x0000 0x8800	; SD logical drive 2  C:
-.dph3:	nocache_dph     0x0000 0xc800	; SD logical drive 3  D:
-.dph4:	nocache_dph     0x0001 0x0800	; SD logical drive 4  E:
-.dph5:	nocache_dph     0x0001 0x4800	; SD logical drive 5  F:
-.dph6:	nocache_dph     0x0001 0x8800	; SD logical drive 6  G:
-.dph7:	nocache_dph     0x0001 0xc800	; SD logical drive 7  H:
-.dph8:	nocache_dph     0x0002 0x0800	; SD logical drive 8  I:
-.dph9:	nocache_dph     0x0002 0x4800	; SD logical drive 9  J:
-.dph10:	nocache_dph     0x0002 0x8800	; SD logical drive 10 K:
-.dph11:	nocache_dph     0x0002 0xc800	; SD logical drive 11 L:
-.dph12:	nocache_dph     0x0003 0x0800	; SD logical drive 12 M:
-.dph13:	nocache_dph     0x0003 0x4800	; SD logical drive 13 N:
-.dph14:	nocache_dph     0x0003 0x8800	; SD logical drive 14 O:
-.dph15:	nocache_dph     0x0003 0xc800	; SD logical drive 15 P:
-
-;.dph1:	stub_dph	; useful for testing
-;.dph2:	stub_dph	; useful for testing
-;.dph3:	stub_dph
-;.dph4:	stub_dph
-;.dph5:	stub_dph
-;.dph6:	stub_dph
-;.dph7:	stub_dph
-;.dph8:	stub_dph
-;.dph9:	stub_dph
-;.dph10: stub_dph
-;.dph11: stub_dph
-;.dph12: stub_dph
-;.dph13: stub_dph
-;.dph14: stub_dph
-;.dph15: stub_dph
-
-;.dph0:	dmcache_dph	; This is only supports SD logical drive 0 !!
-
-.dph_vec:
-	dw	.dph0
-	dw	.dph1
-	dw	.dph2
-	dw	.dph3
-	dw	.dph4
-	dw	.dph5
-	dw	.dph6
-	dw	.dph7
-	dw	.dph8
-	dw	.dph9
-	dw	.dph10
-	dw	.dph11
-	dw	.dph12
-	dw	.dph13
-	dw	.dph14
-	dw	.dph15
-.dph_vec_num:	equ	($-.dph_vec)/2		; number of configured drives
+include 'disk_config.asm'
