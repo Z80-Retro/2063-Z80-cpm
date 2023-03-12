@@ -38,13 +38,8 @@ REL_FILES=\
 	filesystem/Makefile \
 	filesystem/README.md \
 	filesystem/diskdefs \
-    filesystem/retro.img \
-	filesystem/sid \
-	filesystem/progs/basic/ \
-    filesystem/progs/example \
-	filesystem/progs/tms9118 \
-	filesystem/progs/tty \
-	filesystem/progs/README.md
+	filesystem/retro.img \
+	filesystem/assemblers
 
 release:
 	rm -f 2063-Z80-cpm.zip
