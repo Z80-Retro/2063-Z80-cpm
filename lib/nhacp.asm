@@ -27,19 +27,25 @@
 
 .nhacp_debug:         equ     1
 
-
+if 1
+.SOM:		equ	's'
+.EOM:		equ	'e'
+.ESC:		equ	'1'
+else
+.SOM:		equ	0xcb
 .EOM:		equ	0xc0
 .ESC:		equ	0xdb
+endif
+.ESC_SOM:	equ	.SOM+1
 .ESC_EOM:	equ	.EOM+1
 .ESC_ESC:	equ	.ESC+1
 
 ;****************************************************************************
 ;****************************************************************************
 nhacp_init:
-if .dn_debug >= 1
+if .nhacp_debug >= 1
         call    iputs
         db      "rw_init entered\r\n\0"
-        ld      a,(.dn_disk)
 endif
 	call	siob_init
 	ret
@@ -82,14 +88,38 @@ nhacp_stg_close:
 	ret
 
 ;****************************************************************************
+; Send a STORAGE-GET-BLOCK message
 ; type 		u8 	0x07
 ; index 	u8 	Storage slot to access
 ; block-number 	u32 	0-based index of block to access
 ; block-length 	u16 	Length of the block
+;
+; Parameters:
+;  HL = block number
+;   A  = slot number
+;  DE = buffer to store block into
+; Return:
+;  If CY is set then error/timeout
 ;****************************************************************************
 nhacp_get_blk:
-	ld	a,1	; A = 1 = error
+	ld	(.get_blk_block),hl
+	ld	(.get_blk_slot),a
+	ld	hl,.get_blk
+	ld	b,8
+	call	nhacp_tx_msg
+	ld	b,128
+	call	.rx_buffer
 	ret
+
+.get_blk:
+	db	0x07
+.get_blk_slot:
+	db	0
+.get_blk_block:
+	dw	0,0
+.get_blk_len:
+	dw	128	; all blocks on the Retro are 128 bytes 
+
 
 ;****************************************************************************
 ; type 	u8 	0x08
@@ -104,15 +134,53 @@ nhacp_put_blk:
 
 ;****************************************************************************
 ; Write one character
+; A = character to send
 ;****************************************************************************
 nhacp_tx_ch:
+	cp	.SOM
+	jr	z,.tx_som
+	cp	.EOM
+	jr	z,.tx_eom
+	cp	.ESC
+	jr	z,.tx_esc
+	ld	c,a
+.tx_loop:
+	call	siob_tx_char
 	ret
-
+.tx_som:
+	ld	c,.ESC
+	call	siob_tx_char
+	ld	c,.ESC_SOM
+	jp	.tx_loop
+.tx_eom:
+	ld	c,.ESC
+	call	siob_tx_char
+	ld	c,.ESC_EOM
+	jp	.tx_loop
+.tx_esc:
+	ld	c,.ESC
+	call	siob_tx_char
+	ld	c,.ESC_ESC
+	jp	.tx_loop
 
 
 ;****************************************************************************
+; Send the given buffer with EOM framing bytes around it.
+;
+; Parameters:
+;  HL = buff to send
+;  B  = number of bytes to write
 ;****************************************************************************
 nhacp_tx_msg:
+	ld	c,.SOM
+	call	siob_tx_char	; write without escaping
+.tx_msg_loop:
+	ld	a,(hl)
+	call	nhacp_tx_ch
+	inc	hl
+	djnz	.tx_msg_loop
+	ld	c,.EOM
+	call	siob_tx_char	; write without escaping
 	ret
 
 
@@ -124,23 +192,50 @@ nhacp_tx_msg:
 ;  CY = 1 = timeout 
 ;****************************************************************************
 .rx_ch_loop:
-	; XXX wait forever for now
+	; XXX add timeout logic later
 nhacp_rx_ch:
 	in	a,(sio_bc)      ; read sio control status byte
 	rra			; if rcvr is ready then CY = 1
 	jr	nc,.rx_ch_loop
-	ld	a,(sio_bd)	; read the new character
+	in	a,(sio_bd)	; read the new character
+if 0
+	push	af
+	call	hexdump_a
+;	ld	a,'.'
+;	out	(sio_ad),a
+	pop	af
+endif
 	ccf			; invert the CY flag
 	ret			; CY = 0 = OK
 	
 ;****************************************************************************
-; Read up to B bytes from the nhacp link and store them into (HL) 
+; Read up to B bytes from the NHACP link and store them into (HL) 
 ; Upon return, HL will point to the first unused byte in the buffer.
+;
+; Message format:
+;
+;  SOM {data,(ESC,X)}* EOM
+;
+; The data returned will not include the EOM framing bytes and the
+; escapes will have been applied.
+;
+; This function will discard all data until it sees an EOM and then read
+; data into the buffer until it sees a second EOM or the operation times 
+; out.
+;
+; HL = buffer
+; B  = buffer size (0 = 256)
 ;
 ; Return:
 ;  if CY set then error
 ;****************************************************************************
 nhacp_rx_msg:
+	call	nhacp_rx_ch		; read a character
+	ret	c			; timeout, CY = 1
+	cp	.SOM			; of A == .SOM then we can start reading message data
+	jr	nz,nhacp_rx_msg		; discard the garbage byte
+
+.nhacp_rx_loop:
 	call	nhacp_rx_ch		; read a character
 	ret	c			; timeout, CY = 1
 	cp	.EOM			; of A == .EOM then Z=1 and CY=0
@@ -150,7 +245,7 @@ nhacp_rx_msg:
 
 	ld	(hl),a			; store the character read into the buffer
 	inc	hl			; HL = next buffer address to fill
-	djnz	nhacp_rx_msg		; B = B-1, if not zero then loop
+	djnz	.nhacp_rx_loop		; B = B-1, if not zero then loop
 	scf				; set the CY flag because we overflowed 
 	ret	
 
@@ -161,7 +256,64 @@ nhacp_rx_msg:
 
 	ld	(hl),a			; store the character read into the buffer
 	inc	hl			; HL = next buffer address to fill
-	djnz	nhacp_rx_msg		; B = B-1, if not zero then loop
+	djnz	.nhacp_rx_loop		; B = B-1, if not zero then loop
 	scf				; set the CY flag because we overflowed 
 	ret	
+
+
+;****************************************************************************
+; Special case for reading a DATA-BUFFER response
+;
+; Parameters:
+;  DE = address of the buffer to store into
+;   B = number of bytes to read
+; Return:
+;  If CY is set then timeout
+;  B  = residual length
+;  DE = buffer length from the message header
+;****************************************************************************
+.rx_buffer:
+	; discard EOMs until we see an 0x84
+	call	nhacp_rx_ch		; read a character
+	ret	c			; timeout, CY = 1
+	cp	.SOM			; of A == .SOM then Z=1 and CY=0
+	jr	nz,.rx_buffer		; thank you sir, may I have another..
+	call	nhacp_rx_ch		; read a character
+	ret	c			; timeout, CY = 1
+	cp	0x84
+;	jr	z,.rx_buffer_len1
+	scf
+	ret	nz			; error due to unexpected message arriving
+
+	ld	l,e
+	ld	h,d			; HL = buffer address
+
+	call	nhacp_rx_ch
+	ret	c
+	ld	e,a
+	call	nhacp_rx_ch
+	ret	c
+	ld	d,a			; DE = data length
+
+.rx_buffer_loop:
+	call	nhacp_rx_ch
+	cp	.ESC
+	jr	z,.rx_buffer_esc
+	cp	.EOM
+	ret	z			; CY clear after CP and we are done
+	ld	(hl),a
+	inc	hl
+	djnz	.rx_buffer_loop
+	or	a			; clear CY flag
+	ret
+
+.rx_buffer_esc:
+	call	nhacp_rx_ch
+	ret	c
+	dec	a
+	ld	(hl),a
+	inc	hl
+	djnz	.rx_buffer_loop
+	or	a
+	ret
 
