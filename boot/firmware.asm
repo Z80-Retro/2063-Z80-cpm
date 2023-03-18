@@ -1,6 +1,6 @@
 ;****************************************************************************
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2021,2022,2023 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,26 @@
 ;    USA
 ;
 ;****************************************************************************
+;
+; Boot flash versions:
+;
+; This code will enter the loaded application with a value in the A register 
+; that indicates the version of the FLASH code:
+;
+; A = 0 Code was loaded from the SD card starting from the first partition.
+;       The code read from the SD card will be placed into RAM at LOAD_BASE.
+;       The first partition is assumed to begin at SD block number 0x800.
+;
+; A = 1 Code was loaded from the SD card starting from the indicated partition.
+;       The code read from the SD card will be placed into RAM at LOAD_BASE.
+;       The booted partition number will be stored in the C register.
+;	C=1: first partition, C=2: second,...
+;       The booted partition starting SD block number will be stored into
+;       the DE and HL pairs.  DE = the high 16 and HL = the low 16 bits.
+;
+;****************************************************************************
+
+.boot_rom_version:	equ	1
 
 .debug:		equ	0		; Set to 1 to show debug printing, else 0 
 
@@ -33,7 +53,7 @@ include	'memory.asm'
 	; NOTE THAT THE SRAM IS NOT READABLE AT THIS POINT
 	;###################################################
 
-	; Select SRAM low bank 0, idle the SD card, and idle printer signals
+	; Select SRAM low bank 14, idle the SD card, and idle printer signals
 	ld	a,(gpio_out_cache)
 	out	(gpio_out),a
 
@@ -322,10 +342,13 @@ if 1
 endif
 
 	call	read_blocks
-	pop	de			; Remove the 32-bit block number from the stack.
+	pop	hl			; Remove the 32-bit block number from the stack.
 	pop	de
 
+	ld	c,1			; XXX note we booted from partition #1
+
 	or	a
+	ld	a,.boot_rom_version
 	jp	z,LOAD_BASE		; Run the code that we just read in from the SD card.
 
 	call	iputs
@@ -431,7 +454,8 @@ include 'puts.asm'
 ; This is a cache of the last written data to the gpio_out port.
 ; The initial value here is what is written to the latch during startup.
 ;##############################################################################
-gpio_out_cache:	db	gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb
+.low_bank:      equ     0x0e    ; The RAM BANK to use for the bottom 32K
+gpio_out_cache:	db	gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb|gpio_out_sd_clk|(.low_bank<<4)
 
 
 ;##############################################################################
