@@ -229,6 +229,16 @@ endif
 ; Return:
 ;  if CY set then error
 ;****************************************************************************
+
+;XXX
+;SOM is only of interest when skipping to the start of the next message.  
+;While skipping, no other compares need be done. While ingesting a packet 
+;body, we only need to check for ESC or EOM.  If ESC and EOM both have 
+;their high (or low) 7 bits identical then you only need a shift, CP 
+;and conditional branch.  At the branch target, check the carry for which 
+;of the two you got.
+
+
 nhacp_rx_msg:
 	call	nhacp_rx_ch		; read a character
 	ret	c			; timeout, CY = 1
