@@ -8,3 +8,26 @@ diskdef z80-retro-2k-8m
   boottrk 32
   os 2.2
 end
+
+diskdef z80-retro-8k-8m
+  seclen 128
+  tracks 16384
+  sectrk 4
+  blocksize 8192
+  maxdir 512
+  skew 1
+  boottrk 32
+  os 2.2
+end
+
+diskdef z80-retro-16k-8m
+  seclen 128
+  tracks 16384
+  sectrk 4
+  blocksize 16384
+  maxdir 512
+  skew 1
+  boottrk 32
+  os 2.2
+end
+

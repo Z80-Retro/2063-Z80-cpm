@@ -1,0 +1,10 @@
+# A set of default values of things that might be of 
+# interest to more than one Makefile.
+
+DISKDEF=z80-retro-8k-8m
+
+# For normal use on a plain Raspberry PI
+SD_DEV=/dev/sda1
+
+# This is used before burning an SD card image to make sure we are on the correct host!
+SD_HOSTNAME=raspberrypi

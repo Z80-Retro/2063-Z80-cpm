@@ -2,75 +2,64 @@
 # sample downloads like adventure.
 #
 # To create an image with CP/M distro plus adventure:
-# make retro.img
+# make drive.img
 #
-# To create an image with CP/M distro plus adventure and local additions:
-# make local
+# To erase an SD card to prepare it for use:
+# make blank-all-sd
+#
+# To copy the CP/M files onto drive A:
+# make burn
+#
+#
+# This is where the adventure game files came from:
+# wget -P adventure https://ifarchive.org/if-archive/games/cpm/cpm-advent.zip 
 #
 # To list the files that are in the created image:
-# make lsimg
+# make ls
 
-SUBDIRS=\
-	progs/tty \
-	progs/example \
-	progs/tms9118
+# Put the 'all' target first so that it is THE default target.
+# The :: means that more than one of the same target name is same as one big one.
 
-CLEAN_DIRS=$(SUBDIRS:%=clean-%)
-ALL_DIRS=$(SUBDIRS:%=all-%)
+all::
 
-.PHONY: all clean $(CLEAN_DIRS) $(ALL_DIRS)
+# optionally include rules from a local file:
+include Make.default
+-include Make.local
 
-all:: $(ALL_DIRS)
+.PHONY: all clean world burn blank-all-sd
 
-clean:: $(CLEAN_DIRS)
+
+all:: drive.img 
+
+clean::
+	rm -f drive.img
 
 world:: clean all
 
-$(ALL_DIRS):
-	$(MAKE) -C $(@:all-%=%) all
+drive.img: ../retro/retro.bin 
+	rm -f $@
+	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin $@
+	cpmcp -f $(DISKDEF) $@ ../cpm-2.2/filesystem/* 0:
+	cpmcp -f $(DISKDEF) $@ assemblers/sid/*.com 0:
+	cpmcp -f $(DISKDEF) $@ adventure/* 0:
 
-$(CLEAN_DIRS):
-	$(MAKE) -C $(@:clean-%=%) clean
 
-
-
-
-all:: retro.img
-
-retro.img: ../retro/retro.bin 
-	rm -f retro.img
-	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
-	cpmcp -f z80-retro-2k-8m retro.img ../cpm-2.2/filesystem/* 0:
-	cpmcp -f z80-retro-2k-8m retro.img assemblers/sid/*.com 0:
-	cpmcp -f z80-retro-2k-8m retro.img adventure/* 0:
-	cpmcp -f z80-retro-2k-8m retro.img progs/tms9118/*.com 0:
-
-local: retro.img
-	if [ `ls -1 local/*/*/* 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f z80-retro-2k-8m retro.img local/*/*/* 0: ; \
+burn: drive.img
+	@ if [ `hostname` != "$(SD_HOSTNAME)" -o ! -b "$(SD_DEV)" ]; then\
+		echo "\nWARNING: You are either NOT logged into $(SD_HOSTNAME) or there is no $(SD_DEV) mounted!\n"; \
+		false; \
 	fi
-	if [ `ls -1 progs/*/*.com 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f z80-retro-2k-8m retro.img progs/*/*.com 0: ; \
+	sudo dd if=$< of=$(SD_DEV) bs=512 conv=fsync
+
+
+# Erase ALL the CP/M drives on the SD card.  *** VERY DANGEROUS ***
+# Write 16*8M of 0xE5 bytes into the CP/M partition on the SD card
+blank-all-sd: 
+	@ if [ `hostname` != "$(SD_HOSTNAME)" -o ! -b "$(SD_DEV)" ]; then\
+		echo "\nWARNING: You are either NOT logged into $(SD_HOSTNAME) or there is no $(SD_DEV) mounted!\n"; \
+		false; \
 	fi
-	if [ `ls -1 progs/*/*.bas 2>/dev/null | wc -l` -gt 0 ]; then\
-		cpmcp -f z80-retro-2k-8m retro.img progs/*/*.bas 0: ; \
-	fi
+	LC_CTYPE=C tr '\0' '\345' < /dev/zero | sudo dd of=$(SD_DEV) bs=8M count=16 conv=fsync iflag=fullblock
 
-
-# this is where the adventure game files came from:
-adventure/cpm-advent.zip:
-	wget -P adventure https://ifarchive.org/if-archive/games/cpm/cpm-advent.zip 
-
-
-clean::
-	rm -f retro.img 
-
-burn: retro.img
-	if [ `hostname` = "raspberrypi" ]; then \
-		sudo dd if=retro.img of=/dev/sda1 bs=512; \
-	else \
-		echo "WARNING: If you are NOT on a raspberrypi then this may destroy your filesystem!"; \
-	fi
-
-lsimg: retro.img
-	cpmls -f z80-retro-2k-8m retro.img 
+ls:: drive.img 
+	cpmls -f $(DISKDEF) $^

@@ -107,17 +107,15 @@ CONOUT: JP      .bios_conout
 LIST:   JP      .bios_list
 PUNCH:  JP      .bios_punch
 READER: JP      .bios_reader
-HOME:   JP      .bios_home
-SELDSK: JP      .bios_seldsk
-SETTRK: JP      .bios_settrk
-SETSEC: JP      .bios_setsec
-SETDMA: JP      .bios_setdma
-READ:   JP      bios_read
-WRITE:  JP      bios_write
+HOME:   JP      disk_home
+SELDSK: JP      disk_seldsk
+SETTRK: JP      disk_settrk
+SETSEC: JP      disk_setsec
+SETDMA: JP      disk_setdma
+READ:   JP      disk_read
+WRITE:  JP      disk_write
 PRSTAT: JP      .bios_prstat
-SECTRN: JP      .bios_sectrn
-
-
+SECTRN: JP      disk_sectrn
 
 
 ;##########################################################################
@@ -171,8 +169,8 @@ endif
 	ld	(hl),0
 	ldir
 
-	; Either ensure the stack is in high RAM or disable IRQs to call rw_init!
-	call	rw_init			; initialize anything needed for disk read/write 
+	; Either ensure the stack is in high RAM or disable IRQs to call disk_init!
+	call	disk_init		; initialize anything needed for disk read/write 
 
 	jp	.go_cpm
 
@@ -215,9 +213,9 @@ endif
 
 .bios_wboot:
 
-	; We can't just blindly set SP=bios_stack here because bios_read will overwrite it!
+	; We can't just blindly set SP=bios_stack here because disk_read can overwrite it!
 	; But we CAN set to use other areas that we KNOW are not currently in use!
-	ld	sp,.bios_wboot_stack			; the .bios_dirbuf is garbage right now
+	ld	sp,.bios_wboot_stack			; the disk_dirbuf is garbage right now
 
 
 if .debug >= 2
@@ -225,31 +223,27 @@ if .debug >= 2
 	db	"\r\n.bios_wboot entered\r\n\0"
 endif
 
-	; XXX Should not need to reinitialize the cache for a warm boot
-	; Either ensure the stack is in high RAM or disable IRQs to call rw_init!
-	;call	rw_init			; initialize anything needed for disk read/write 
-
 	; reload the CCP and BDOS
 
 	ld	c,0			; C = drive number (0=A)
-	call	.bios_seldsk		; load the OS from drive A
+	call	disk_seldsk		; load the OS from drive A
 
 	ld	bc,.wb_trk		; BC = track number whgere the CCP starts
-	call	.bios_settrk
+	call	disk_settrk
 
 	ld	bc,.wb_sec		; sector where the CCP begins on .wb_trk
-	call	.bios_setsec
+	call	disk_setsec
 
 	ld	bc,CPM_BASE		; starting address to read the OS into
-	call	.bios_setdma
+	call	disk_setdma
 
 	ld	bc,.wb_nsects		; BC = gross number of sectors to read
 .wboot_loop:
 	push	bc			; save the remaining sector count
 
-	call	bios_read		; read 1 sector
+	call	disk_read		; read 1 sector
 
-	or	a			; bios_read sets A=0 on success
+	or	a			; disk_read sets A=0 on success
 	jr	z,.wboot_sec_ok		; if read was OK, continue processing
 
 	; If there was a read error, stop.
@@ -257,33 +251,33 @@ endif
 	db      "\r\n\r\nERROR: WBOOT READ FAILED.  HALTING."
 	db      "\r\n\n*** PRESS RESET TO REBOOT ***\r\n"
 	db      0
-	jp      $               ; endless spin loop
+	jp      $               	; endless spin loop
 
 .wboot_sec_ok:
 	; advance the DMA pointer by 128 bytes
-	ld	hl,(bios_disk_dma)	; HL = the last used DMA address
+	ld	hl,(disk_dma)	; HL = the last used DMA address
 	ld	de,128
 	add	hl,de			; HL += 128
 	ld	b,h
 	ld	c,l			; BC = HL
-	call	.bios_setdma
+	call	disk_setdma
 
 	; increment the sector/track numbers
-	ld	a,(bios_disk_sector)	; A = last used sector number (low byte only for 0..3)
+	ld	a,(disk_sec)		; A = last used sector number (low byte only for 0..3)
 	inc	a
 	and	0x03			; if A+1 = 4 then A=0
 	jr	nz,.wboot_sec		; if A+1 !=4 then do not advance the track number
 
 	; advance to the next track
-	ld	bc,(bios_disk_track)
+	ld	bc,(disk_track)
 	inc	bc
-	call	.bios_settrk
+	call	disk_settrk
 	xor	a			; set A=0 for first sector on new track
 
 .wboot_sec:
 	ld	b,0
 	ld	c,a
-	call	.bios_setsec
+	call	disk_setsec
 
 	pop	bc			; BC = remaining sector counter value
 	dec	bc			; BC -= 1
@@ -305,7 +299,7 @@ endif
 	ld	(6),hl		; address 6 now = JP FBASE
 
 	ld	bc,0x80		; this is here because it is in the example CBIOS (AG p.52)
-	call	.bios_setdma
+	call	disk_setdma
 
 if .debug >= 3
 	; dump the zero-page for reference
@@ -352,12 +346,12 @@ endif
 if 1
 	jp	con_rx_char
 else
-	; a simple hack to let us dump status on demand
+	; a simple hack to let us dump the dmcache status on demand
 	call	con_rx_char
-	cp	0x1B			; escape key??
-	ret	nz			; if not an escape then return
-	call	z,rw_debug_wedge	; else tail-call the debug wedge
-	ld	a,0x1B			; restore the trigger key value
+	cp	0x1B				; escape key??
+	ret	nz				; if not an escape then return
+	call	z,disk_dmcache_debug_wedge	; else tail-call the debug wedge
+	ld	a,0x1B				; restore the trigger key value
 	ret
 endif
 
@@ -426,189 +420,6 @@ endif
 	ret
 
 ;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p18:
-; Return the disk head of the currently selected disk to the track 
-; 00 position.
-;
-; The Z80 Retro! does not have a mechanical disk drive. So just treat
-; this like a SETTRK 0.
-;
-;##########################################################################
-.bios_home:
-if .debug >= 2
-	call	iputs
-	db	".bios_home entered\r\n\0"
-endif
-
-	ld	bc,0		; BC = 0 = track number passed into .bios_settrk
-
-	; Fall into .bios_settrk <--------------- NOTICE!!
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p19:
-; Register BC contains the track number for subsequent disk
-; accesses on the currently selected drive.  BC can take on
-; values from 0-65535.
-;
-;##########################################################################
-.bios_settrk:
-	ld	(bios_disk_track),bc
-
-if .debug >= 2
-	call	iputs
-	db	".bios_settrk entered: \0"
-	call	bios_debug_disk
-endif
-	ret
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p18:
-; Select the disk drive given by register C for further operations, where
-; register C contains 0 for drive A, 1 for drive B, and so-forth UP to 15
-; for drive P.
-;
-; On each disk select, SELDSK must return in HL the base address of a 
-; l6-byte area, called the Disk Parameter Header for the selected drive.
-;
-; If there is an attempt to select a non-existent drive, SELDSK returns
-; HL=0000H as an error indicator.
-;
-; The Z80 Retro! only has one drive.
-;
-;##########################################################################
-.bios_seldsk:
-	ld	a,c
-	ld	(bios_disk_disk),a		; XXX should we save this now or defer 
-					; till after we validate the value?
-
-if .debug >= 2
-	call	iputs
-	db	".bios_seldsk entered: \0"
-	call	bios_debug_disk
-endif
-
-	ld	hl,0			; HL = 0 = invalid disk 
-	ld	a,(bios_disk_disk)
-	or	a			; did drive A get selected?
-	ret	nz			; no -> error
-
-	ld	hl,.bios_dph		; the DPH for disk A
-	ret
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p19:
-; Register BC contains the sector number for subsequent disk accesses on
-; the currently selected drive.
-;
-;##########################################################################
-.bios_setsec:
-	ld	(bios_disk_sector),bc
-
-if .debug >= 2
-	call	iputs
-	db	".bios_setsec entered: \0"
-	call	bios_debug_disk
-endif
-
-	ret
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p19:
-; Register BC contains the DMA (disk memory access) address for subsequent
-; read or write operations.  For example, if B = 00H and C = 80H when SETDMA
-; is called, then all subsequent read operations read their data into 80H
-; through 0FFH, and all subsequent write operations get their data from
-; 80H through 0FFH, until the next call to SETDMA changes it.
-;
-;##########################################################################
-.bios_setdma:
-	ld	(bios_disk_dma),bc
-
-if .debug >= 2
-	call	iputs
-	db	".bios_setdma entered: \0"
-	call	bios_debug_disk
-endif
-
-	ret
-
-;##########################################################################
-; A debug routing for displaying the settings before a read or write
-; operation.
-;
-; Clobbers AF, C
-;##########################################################################
-if .debug >= 1
-bios_debug_disk:
-	call	iputs
-	db	'disk=0x\0'
-
-	ld	a,(bios_disk_disk)
-	call	hexdump_a
-
-	call    iputs
-	db	", track=0x\0"
-	ld	a,(bios_disk_track+1)
-	call	hexdump_a
-	ld	a,(bios_disk_track)
-	call	hexdump_a
-
-	call	iputs
-	db	", sector=0x\0"
-	ld	a,(bios_disk_sector+1)
-	call	hexdump_a
-	ld	a,(bios_disk_sector)
-	call	hexdump_a
-
-	call	iputs
-	db	", dma=0x\0"
-	ld	a,(bios_disk_dma+1)
-	call	hexdump_a
-	ld	a,(bios_disk_dma)
-	call	hexdump_a
-	call	puts_crlf
-
-	ret
-endif
-
-
-
-
-; Pick the preferred flavor of SD read/write routines.
-
-;include 'rw_stub.asm'
-;include 'rw_nocache.asm'
-include 'rw_dmcache.asm'
-
-
-
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p20:
-; Performs sector logical to physical sector translation in order to improve
-; the overall response of CP/M.
-;
-; Xlate the sector number in BC using table in DE & return in HL
-; If DE=0 here then translation is 1:1
-;
-; The Z80 Retro! does not translate its sectors.  Therefore it will return
-; HL = BC for a 1:1 translation.
-;
-;##########################################################################
-.bios_sectrn:
-	; 1:1 translation  (no skew factor)
-	ld	h,b
-	ld	l,c
-	ret
-
-
-;##########################################################################
 ; Initialize the console port.  Note that this includes CTC port 1.
 ;##########################################################################
 .init_console:
@@ -619,12 +430,11 @@ include 'rw_dmcache.asm'
 	ret
 
 
-
-
-
 ;##########################################################################
 ; Libraries
 ;##########################################################################
+
+include 'disk_callgate.asm'
 
 include 'sio.asm'
 include 'ctc1.asm'
@@ -641,92 +451,10 @@ include 'prn.asm'
 
 gpio_out_cache: ds  1			; GPIO output latch cache
 
-;##########################################################################
-; The bios_disk_XXX values are used to retain the most recent values that
-; have been set by the .bios_setXXX routines.
-; These are used by the bios_read and bios_write routines.
-;##########################################################################
-bios_disk_dma:				; last set value of the DMA buffer address
-	dw	0xa5a5
 
-bios_disk_track:			; last set value of the disk track
-	dw	0xa5a5
-
-bios_disk_disk:				; last set value of the selected disk
-	db	0xa5
-
-bios_disk_sector:			; last set value of of the disk sector
-	dw	0xa5a5
-
-
-
-;##########################################################################
-; Goal: Define a CP/M-compatible filesystem that can be implemented using
-; an SDHC card.  An SDHC card is comprised of a number of 512-byte blocks.
-;
-; Plan:
-; - Put 4 128-byte CP/M sectors into each 512-byte SDHC block.
-; - Treat each SDHC block as a CP/M track.
-;
-; This CP/M filesystem has:
-;  128 bytes/sector (CP/M requirement)
-;  4 sectors/track (Retro BIOS designer's choice)
-;  65536 total sectors (max CP/M limit)
-;  65536*128 = 8388608 gross bytes (max CP/M limit)
-;  65536/4 = 16384 tracks
-;  2048 allocation block size BLS (Retro BIOS designer's choice)
-;  8388608/2048 = 4096 gross allocation blocks in our filesystem
-;  32 = number of reserved tracks to hold the O/S
-;  32*512 = 16384 total reserved track bytes
-;  floor(4096-16384/2048) = 4088 total allocation blocks, absent the reserved tracks
-;  512 directory entries (Retro BIOS designer's choice)
-;  512*32 = 16384 total bytes in the directory
-;  ceiling(16384/2048) = 8 allocation blocks for the directory
-;
-;                  DSM<256   DSM>255
-;  BLS  BSH BLM    ------EXM--------
-;  1024  3    7       0         x
-;  2048  4   15       1         0  <----------------------
-;  4096  5   31       3         1
-;  8192  6   63       7         3
-; 16384  7  127      15         7
-;
-; ** NOTE: This filesystem design is inefficient because it is unlikely
-;          that ALL of the allocation blocks will ultimately get used!
-;
-;##########################################################################
-.bios_dph:
-	dw	0		; XLT sector translation table (no xlation done)
-	dw	0		; scratchpad
-	dw	0		; scratchpad
-	dw	0		; scratchpad
-	dw	.bios_dirbuf	; DIRBUF pointer
-	dw	.bios_dpb_a	; DPB pointer
-	dw	0		; CSV pointer (optional, not implemented)
-	dw	.bios_alv_a	; ALV pointer
-
-.bios_dirbuf:
+disk_dirbuf:
 	ds	128		; scratch directory buffer
 .bios_wboot_stack:		; (ab)use the BDOS directory buffer as a stack during WBOOT
-
-.bios_dpb_a:
-	dw	4		; SPT
-	db	4		; BSH
-	db	15		; BLM
-	db	0		; EXM
-	dw	4087		; DSM (max allocation block number)
-	dw	511		; DRM
-	db	0xff		; AL0
-	db	0x00		; AL1
-	dw	0		; CKS
-	dw	32		; OFF
-
-.bios_alv_a:
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
-.bios_alv_a_end:
-
-
-
 
 
 ;##########################################################################
