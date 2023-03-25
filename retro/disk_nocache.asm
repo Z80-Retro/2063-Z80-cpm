@@ -386,7 +386,7 @@ endif
 ;##########################################################################
 .nocache_init:
 ;	call	iputs
-;	db	'NOTICE: rw_nocache library installed. Disk cache disabled.\r\n\0'
+;	db	'NOTICE: disk_nocache library installed. Disk cache disabled.\r\n\0'
 
 	ld	a,1
 	ld	(.sdbuf_val),a	; mark .sdbuf_trk as invalid

@@ -112,7 +112,7 @@ endif
 ;##########################################################################
 .stub_init:
 	call	iputs
-	db	'NOTICE: rw_stub library installed. All disk I/O disabled.\r\n\0'
+	db	'NOTICE: disk_stub library installed. All disk I/O disabled.\r\n\0'
 	ret
 
 

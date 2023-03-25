@@ -5,12 +5,12 @@
 ; 	Do *NOT* expected to mount the same drive more than one 
 ;	way and expect it to work without corrupting the drive!
 ;****************************************************************************
-include 'rw_nocache.asm'
-;include 'rw_dmcache.asm'
-;include 'rw_stub.asm'
-;include 'disk_nhacp.asm'
 
 ; Create a DPH & ALV for each filesystem 
+
+if 0
+
+include 'disk_nocache.asm'
 .dph0:	nocache_dph     0x0000 0x0800	; SD logical drive 0  A:
 .dph1:	nocache_dph     0x0000 0x4800	; SD logical drive 1  B:
 .dph2:	nocache_dph     0x0000 0x8800	; SD logical drive 2  C:
@@ -28,6 +28,15 @@ include 'rw_nocache.asm'
 .dph14:	nocache_dph     0x0003 0x8800	; SD logical drive 14 O:
 .dph15:	nocache_dph     0x0003 0xc800	; SD logical drive 15 P:
 
+else
+
+include 'disk_dmcache.asm'
+.dph0:	dmcache_dph	0x0000 0x0800	; This is works on 0x0000 0x0800 !!
+
+endif
+
+
+;include 'disk_stub.asm'
 ;.dph1:	stub_dph	; useful for testing
 ;.dph2:	stub_dph	; useful for testing
 ;.dph3:	stub_dph
@@ -44,10 +53,10 @@ include 'rw_nocache.asm'
 ;.dph14: stub_dph
 ;.dph15: stub_dph
 
-;.dph0:	dmcache_dph	; This is only supports SD logical drive 0 !!
 
 dph_vec:
 	dw	.dph0
+if 0
 	dw	.dph1
 	dw	.dph2
 	dw	.dph3
@@ -63,4 +72,5 @@ dph_vec:
 	dw	.dph13
 	dw	.dph14
 	dw	.dph15
+endif
 dph_vec_num:	equ	($-dph_vec)/2		; number of configured drives

@@ -346,12 +346,12 @@ endif
 if 1
 	jp	con_rx_char
 else
-	; a simple hack to let us dump status on demand
+	; a simple hack to let us dump the dmcache status on demand
 	call	con_rx_char
-	cp	0x1B			; escape key??
-	ret	nz			; if not an escape then return
-	call	z,rw_debug_wedge	; else tail-call the debug wedge
-	ld	a,0x1B			; restore the trigger key value
+	cp	0x1B				; escape key??
+	ret	nz				; if not an escape then return
+	call	z,disk_dmcache_debug_wedge	; else tail-call the debug wedge
+	ld	a,0x1B				; restore the trigger key value
 	ret
 endif
 

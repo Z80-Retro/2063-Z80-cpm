@@ -86,27 +86,24 @@
 ;
 ;****************************************************************************
 
+.sd_partition_base:	equ	0x800
+
 
 ;##########################################################################
-; set .rw_debug to:
+; set .dmcache_debug to:
 ;    0 = no debug output
 ;    1 = print messages from new code under development
 ;    2 = print all the above plus the primairy 'normal' debug messages
 ;    3 = print all the above plus verbose 'noisy' debug messages
 ;##########################################################################
-;.rw_debug:		equ	3
-.rw_debug:		equ	0
+;.dmcache_debug:		equ	3
+.dmcache_debug:		equ	0
 
 .cache_tag_bank: 	equ	0xd0	; defined in terms of the GPIO port bits 
 ;.cache_tag_base:	equ	0	; the first tag table entry MUST be at 0x0000!
 
 .cache_tag_inval:	equ	0x80	; when MSB is set to 0 then the tag is valid
 .cache_tag_track:	equ	0x3f	; a mask for the tag's track bits 
-
-
-; XXX This is a hack that won't work unless the disk partition < 0x10000
-; XXX This has the SD card partition offset hardcoded in it!!!
-.sd_partition_base: equ	0x800
 
 
 ;##########################################################################
@@ -311,7 +308,7 @@ endif
 	; calculate the address of the CP/M sector in the .bios_sdbuf
 	add	hl,de			; HL = @ of cpm sector in the cache
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.dm_trksec2addr sector addr=\0'
 	ld	a,h
@@ -347,7 +344,7 @@ if 0 ;not yet
 	or	d			; set the bank to that with the desired slot
 	out     (gpio_out),a		; select the cache tag bank
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.cache_slot_padd slot bank=\0'
@@ -404,7 +401,7 @@ endif
         or	a			; clear the CY flag
         sbc     hl,de                   ; HL = got - want
 
-if .rw_debug >= 2
+if .dmcache_debug >= 2
 	jr	nz,.dbg_csm		; if we have a cache-miss then don't print here
 	push	af			; save the flags so can decide to return below
 	call	iputs
@@ -417,7 +414,7 @@ endif
 	ret	z			; if HL==DE then return w/Z=1 now
 
 
-if .rw_debug >= 2
+if .dmcache_debug >= 2
 	call	iputs
 	db	".cache_slot_fill cache miss: \0"
 	call	bios_debug_disk
@@ -440,7 +437,7 @@ endif
 	ld	(gpio_out_cache),a	; save it so that the SD/SPI logic uses the right value
 	out     (gpio_out),a		; select the cache tag bank
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.cache_slot_fill slot bank=\0'
@@ -458,7 +455,8 @@ endif
 
 	; Calculate the SD physical block number that we want to read
 	pop	hl
-	push	hl
+	push	hl			; HL = cp/m track number
+if 1
 	ld	bc,.sd_partition_base	; XXX Add the starting partition block number
 	add	hl,bc			; HL = SD physical block number
 
@@ -466,8 +464,16 @@ endif
 	ld	bc,0
 	push	bc			; 32-bit SD block number (big end)
 	push	hl			; 32-bit SD block number (little end)
+else
+; this doesn't work
+	call	.calc_sd_block		; DE,HL = partition_base + HL
 
-if .rw_debug >= 3
+	; Push the 32-bit physical SD block number into the stack in little-endian order
+	push	de			; 32-bit SD block number (big end)
+	push	hl			; 32-bit SD block number (little end)
+endif
+
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.cache_slot_fill slot addr=\0'
 	ld	a,d
@@ -495,7 +501,7 @@ endif
 	ld	(gpio_out_cache),a	
 	out     (gpio_out),a
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af			; save the GPIO latch value
 	call	iputs
 	db	'.cache_slot_fill SD read block failed.  restore bank=\0'
@@ -510,7 +516,7 @@ endif
 
 .cache_fill_ok:
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.cache_slot_fill update tag=\0'
 	pop	hl			; HL = the CP/M track number we want
@@ -533,7 +539,7 @@ endif
 	ld	(gpio_out_cache),a	
 	out     (gpio_out),a
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.cache_slot_fill restore bank=\0'
@@ -575,7 +581,7 @@ endif
 	ld	(gpio_out_cache),a	; save it so that the SD/SPI logic uses the right value
 	out     (gpio_out),a		; select the cache tag bank
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.cache_slot_flush slot bank=\0'
@@ -586,7 +592,7 @@ endif
 
 	; calculate the slot address within the selected bank
 	pop	hl			; HL = the CP/M track number we want
-	push	hl
+	push	hl			;	...and leave a copy on the stack
 	call	.dm_trk2slt
 	call	.dm_slt2adr		; HL = target slot buffer address to read the 512-byte block
 	ex	de,hl			; DE = slot buffer address (and HL = garbage)
@@ -594,13 +600,26 @@ endif
 	; write the cache slot contents to the SD card
 	pop	hl			; HL=CP/M track number
 
+if 1
 	ld	bc,.sd_partition_base	; XXX add the starting partition block number
 	add	hl,bc			; HL = SD physical block number
 	ld	bc,0
 	push	bc			; SD block number to write
 	push	hl
+else
+; this doesn't work
+	ld	c,e
+	ld	b,d			; BC = DE
+	call	.calc_sd_block		; DE,HL = partition_base + HL
 
-if .rw_debug >= 3
+	; Push the 32-bit physical SD block number into the stack in little-endian order
+	push	de			; 32-bit SD block number (big end)
+	push	hl			; 32-bit SD block number (little end)
+	ld	e,c
+	ld	d,b			; DE = BC
+endif
+
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.cache_slot_flush slot addr=\0'
 	ld	a,d
@@ -628,7 +647,7 @@ endif
 	ld	(gpio_out_cache),a	
 	out     (gpio_out),a
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af			; save the GPIO latch value
 	call	iputs
 	db	'.cache_slot_flush restore bank=\0'
@@ -668,7 +687,7 @@ endif
 	ld	(gpio_out_cache),a		; save it so that the SD/SPI logic uses the right value
 	out     (gpio_out),a			; select the cache tag bank
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.copy_cache2ram slot bank=\0'
@@ -690,7 +709,7 @@ endif
 	; we need to use a bounce buffer
 	ld	de,.dm_bounce_buffer
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.copy_cache2ram bounce dest=\0'
 	ld	a,d
@@ -711,7 +730,7 @@ endif
 	ld	hl,.dm_bounce_buffer
 	ld	de,(disk_dma)
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.copy_cache2ram bounce src=\0'
 	ld	a,h
@@ -722,7 +741,7 @@ endif
 
 .copy_cache2ramd:
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	', dest=\0'
 	ld	a,d
@@ -740,7 +759,7 @@ endif
 	ld	(gpio_out_cache),a	
 	out     (gpio_out),a
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.copy_cache2ram restore bank=\0'
@@ -771,7 +790,7 @@ endif
 
 	ld	hl,(disk_dma)		; HL = CP/M target buffer address
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.copy_ram2cache sector src dma addr=\0'
 	ld	a,h
@@ -788,7 +807,7 @@ endif
 	; Need to copy the sector into the bounce buffer
 	ld	de,.dm_bounce_buffer
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	', bounce dest=\0'
 	ld	a,d
@@ -802,7 +821,7 @@ endif
 	ldir
 	ld	hl,.dm_bounce_buffer
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	call	iputs
 	db	'.copy_ram2cache bounce src=\0'
 	ld	a,h
@@ -829,7 +848,7 @@ endif
 	ld	(gpio_out_cache),a		; save it so that the SD/SPI logic uses the right value
 	out     (gpio_out),a			; select the cache tag bank
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	', dest slot bank=\0'
@@ -851,7 +870,7 @@ endif
 	ld	(gpio_out_cache),a	
 	out     (gpio_out),a
 
-if .rw_debug >= 3
+if .dmcache_debug >= 3
 	push	af
 	call	iputs
 	db	'.copy_ram2cache restore bank=\0'
@@ -882,14 +901,14 @@ endif
 ;
 ;##########################################################################
 .dmcache_read:
-if .rw_debug >= 1
+if .dmcache_debug >= 1
 	call	iputs
 	db	".dmcache_read entered: \0"
 	call	disk_dump
 endif
 
 
-if .rw_debug >= 1
+if .dmcache_debug >= 1
 
 	; Test the conversion routines
 
@@ -1053,7 +1072,7 @@ endif
 ;##########################################################################
 .dmcache_write:
 
-if .rw_debug >= 1
+if .dmcache_debug >= 1
 	push	bc
 	call	iputs
 	db	".dmcache_write entered, C=\0"
@@ -1122,6 +1141,31 @@ endif
 
 	ret
 
+if 0
+;##########################################################################
+; Calculate the address of the SD block, given the CP/M track number
+; in HL and the fact that the currently selected drive's DPH is in 
+; disk_dph.
+; Clobbers: DE, HL, IX
+; HL = CP/M track number
+; Return: the 32-bit block number in DE,HL
+; Based on proposal from Trevor Jacobs - 02-15-2023
+;##########################################################################
+.calc_sd_block:
+        ld      ix,(disk_dph)           ; IX = current DPH base address
+        ld      e,(ix+16)               ; DE = low-word of the SD starting block
+        ld      d,(ix+17)               ; DE = low-word of the SD starting block
+        add     hl,de
+        push    hl
+        ld      l,(ix+18)
+        ld      h,(ix+19)
+        ld      de,0
+        adc     hl,de                   ; cy flag still set from add hl,de
+        ld      e,l
+        ld      d,h
+        pop     hl
+        ret
+endif
 
 ;##########################################################################
 ; A bounce buffer used when copying between a DM cache bank and a DMA 
@@ -1149,7 +1193,7 @@ endif
 ;##########################################################################
 .dmcache_init:
 	call    iputs
-	db      'NOTICE: rw_dmcache library installed.\r\n\0'
+	db      'NOTICE: dmcache library installed.\r\n\0'
 
 	; initialize the cache tags
 	
@@ -1186,8 +1230,8 @@ endif
 ;	value! 
 ;
 ;##########################################################################
-if .rw_debug >= 3
-rw_debug_wedge:
+if .dmcache_debug >= 3
+disk_dmcache_debug_wedge:
 
 	; switch to a local stack since we need to change the RAM bank
 	push	hl			; save HL into the caller's stack
@@ -1244,28 +1288,28 @@ endif
 ;  65536 total sectors (max CP/M limit)
 ;  65536*128 = 8388608 gross bytes (max CP/M limit)
 ;  65536/4 = 16384 tracks
-;  2048 allocation block size BLS (Retro BIOS designer's choice)
-;  8388608/2048 = 4096 gross allocation blocks in our filesystem
+;  8192 allocation block size BLS (Retro BIOS designer's choice)
+;  8388608/8192 = 1024 gross allocation blocks in our filesystem
 ;  32 = number of reserved tracks to hold the O/S
 ;  32*512 = 16384 total reserved track bytes
-;  floor(4096-16384/2048) = 4088 total allocation blocks, absent the reserved tracks
+;  floor(1024-16384/8192) = 1022 total allocation blocks, absent the reserved tracks
 ;  512 directory entries (Retro BIOS designer's choice)
 ;  512*32 = 16384 total bytes in the directory
-;  ceiling(16384/2048) = 8 allocation blocks for the directory
+;  ceiling(16384/8192) = 2 allocation blocks for the directory
 ;
 ;                  DSM<256   DSM>255
 ;  BLS  BSH BLM    ------EXM--------
 ;  1024  3    7       0         x
-;  2048  4   15       1         0  <----------------------
+;  2048  4   15       1         0
 ;  4096  5   31       3         1
-;  8192  6   63       7         3
+;  8192  6   63       7         3  <----------------------
 ; 16384  7  127      15         7
 ;
 ; ** NOTE: This filesystem design is inefficient because it is unlikely
 ;          that ALL of the allocation blocks will ultimately get used!
 ;
 ;##########################################################################
-dmcache_dph:	macro
+dmcache_dph:	macro sdblk_lo sdblk_hi
 	dw	0		; XLT sector translation table (no xlation done)
 	dw	0		; scratchpad
 	dw	0		; scratchpad
@@ -1274,8 +1318,11 @@ dmcache_dph:	macro
 	dw	dmcache_dpb	; DPB pointer
 	dw	0		; CSV pointer (optional, not implemented)
 	dw	.alv		; ALV pointer
+	dw	sdblk_lo	; +16	32-bit starting SD card block number
+	dw	sdblk_hi	; +18
+
 .alv:	ds	0
-	ds	(4087/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
+	ds	(1021/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
 	endm
 
 ;##########################################################################
@@ -1285,14 +1332,13 @@ dmcache_dph:	macro
 	dw	.dmcache_write
 dmcache_dpb:
 	dw	4		; SPT
-	db	4		; BSH
-	db	15		; BLM
-	db	0		; EXM
-	dw	4087		; DSM (max allocation block number)
+	db	6		; BSH
+	db	63		; BLM
+	db	3		; EXM
+	dw	1021		; DSM (max allocation block number)
 	dw	511		; DRM
-	db	0xff		; AL0
+	db	0xc0		; AL0
 	db	0x00		; AL1
 	dw	0		; CKS
 	dw	32		; OFF
-
 

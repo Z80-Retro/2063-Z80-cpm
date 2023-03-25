@@ -28,10 +28,10 @@
 
 ;****************************************************************************
 ;****************************************************************************
-rw_init:
+disk_init:
 if .dn_debug >= 1
 	call    iputs
-	db	"rw_init entered\r\n\0"
+	db	"disk_init entered\r\n\0"
 	ld	a,(.dn_disk)
 endif
 	call	nhacp_init		; init the low-level driver
