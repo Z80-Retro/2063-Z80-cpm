@@ -21,6 +21,9 @@
 ;
 ;****************************************************************************
 
+
+ERROR   DO NOT USE!!!  THIS CODE IS ONLY A STUB.
+
 ; An NHACP driver for network-mounted filesystems.
 
 ; For performance reasons, the SIO driver is not used and the access is in-lined here.
