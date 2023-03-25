@@ -14,18 +14,6 @@ or, if you use ssh (useful if you want to push changes to a repo to make a pull 
 	git clone --recurse-submodules git@github.com:Z80-Retro/2063-Z80-cpm.git
 
 
-## How to Avoid Spoilers!
-
-Starting on 20220304 you can avoid any spoilers while watching my 
-[YouTube video playlist](https://www.youtube.com/playlist?list=PL3by7evD3F51Cf9QnsAEdgSQ4cz7HQZX5) that discusses this project by clicking on the 
-Releases/tags link in github and locate the tag that matches the datecode
-in each video. (Specifically the datecode *in* the video itself, not the
-dates that YouTube posts about when the videos are uploaded etc.)
-
-Note that I use datacodes that look like this: YYYYMMDD.n 
-
-Sorry I did not think of this before.
-
 ## SD Card Preparation
 
 A discussion of how to partition an SD card for the Retro! board can be found in [./README-SD.md](./README-SD.md)
