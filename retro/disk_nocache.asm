@@ -394,9 +394,6 @@ endif
         ret
 
 
-
-if 1
-
 ;##########################################################################
 ; Goal: Define a CP/M-compatible filesystem that can be implemented using
 ; an SDHC card.  An SDHC card is comprised of a number of 512-byte blocks.
@@ -468,72 +465,3 @@ nocache_dpb:
 	dw	0		; CKS
 	dw	32		; OFF
 
-else
-
-;##########################################################################
-; Define a CP/M-compatible filesystem intended to be network-mounted 
-; using NHACP.
-;
-; This defines the disk as having 1 sector on each track.  This will 
-; allow the track number on its own to represent the sector number to
-; transfer in calls to nhacp_write and nhacp_read.
-;
-; This CP/M filesystem has:
-;  128 bytes/sector (CP/M requirement)
-;  4 sector/track (Retro BIOS designer's choice)
-;  65536 total sectors (max CP/M limit)
-;  65536*128 = 8388608 gross bytes (max CP/M limit)
-;  65536/1 = 65536 tracks
-;  16384 allocation block size BLS (Retro BIOS designer's choice)
-;  8388608/16384 = 512 gross allocation blocks in our filesystem
-;  32 = number of reserved tracks to hold the O/S
-;  32*512 = 16384 total reserved track bytes
-;  floor(512-16384/16384) = 511 total allocation blocks
-;  512 directory entries (Retro BIOS designer's choice)
-;  512*32 = 16384 total bytes in the directory
-;  ceiling(16384/16384) = 1 allocation blocks for the directory
-;
-;                  DSM<256   DSM>255
-;  BLS  BSH BLM    ------EXM--------
-;  1024  3    7       0         x
-;  2048  4   15       1         0
-;  4096  5   31       3         1
-;  8192  6   63       7         3 
-; 16384  7  127      15         7  <----------------------
-;
-;##########################################################################
-nocache_dph:	macro sdblk_hi sdblk_lo
-        dw      0               ;  +0 XLT sector translation table (no xlation done)
-        dw      0               ;  +2 scratchpad
-        dw      0               ;  +4 scratchpad
-        dw      0               ;  +6 scratchpad
-        dw      disk_dirbuf   	;  +8 system-wide, shared DIRBUF pointer
-        dw      nocache_dpb	; +10 DPB pointer
-        dw      0               ; +12 CSV pointer (optional, not implemented)
-        dw      .alv		; +14 ALV pointer
-        dw      sdblk_lo        ; +16   32-bit starting SD card block number
-        dw      sdblk_hi        ; +18
-
-.alv:	ds	0
-	ds	(511/8)+1,0xaa	; scratchpad used by BDOS for disk allocation info
-	endm
-
-
-;##########################################################################
-;##########################################################################
-	dw	.nocache_init	; .sd_dpb-6	pointer to the init function
-	dw	.nocache_read	; .sd_dpb-4	pointer to the read function
-	dw	.nocache_write	; .sd_dpb-2	pointer to the write function
-nocache_dpb:
-        dw      4		; SPT
-        db      7		; BSH
-        db      127		; BLM
-        db      7		; EXM
-        dw      510		; DSM (max allocation block number)
-        dw      511             ; DRM
-        db      0x80            ; AL0
-        db      0x00            ; AL1
-        dw      0               ; CKS
-        dw      32              ; OFF
-
-endif
