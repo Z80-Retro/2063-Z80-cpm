@@ -8,7 +8,7 @@
 
 ; Create a DPH & ALV for each filesystem 
 
-if 0
+if 1
 
 include 'disk_nocache.asm'
 .dph0:	nocache_dph     0x0000 0x0800	; SD logical drive 0  A:
@@ -56,7 +56,7 @@ endif
 
 dph_vec:
 	dw	.dph0
-if 0
+if 1
 	dw	.dph1
 	dw	.dph2
 	dw	.dph3
