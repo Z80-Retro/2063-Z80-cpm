@@ -123,7 +123,7 @@ sioa_tx_char:
 siob_rx_char:
 	call	siob_rx_ready
 	jr	z,siob_rx_char
-	ld	a,(sio_bd)
+	in	a,(sio_bd)
 	ret
 
 con_rx_char:
