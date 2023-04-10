@@ -13,6 +13,11 @@ or, if you use ssh (useful if you want to push changes to a repo to make a pull 
 
 	git clone --recurse-submodules git@github.com:Z80-Retro/2063-Z80-cpm.git
 
+Note that if you are jumping around between branches/tags, you might find it useful to recursively
+update the submodules with this command so they match the branch in the parent repo:
+
+	git submodule update --init --recursive
+
 
 ## SD Card Preparation
 
