@@ -66,13 +66,26 @@ include	'memory.asm'
 
 	org	LOAD_BASE		; Where the boot loader places this code.
 
-	; This is the entry point from the boot loader.
+	; When we arrive here from the boot loader:
+	; If A=0 then the SD was booted from a partition that starts at 0x800.
+	;
+	; If A=1 then:
+	; C = partition number (1, 2, 3 or 4)
+	; DE = the high 16 bits of the starting SD block number
+	; HL = the low 16 bits of the starting SD block number
+
+	or	a
+	jp	z,.bios_boot
+
+	; A != 0, patch the BIOS to use the given offset when accessing the SD card
+	ld	(disk_offset_low),hl
+	ld	(disk_offset_hi),de
+
 	jp	.bios_boot
 
 	; The 'org' in cpm22.asm does not generate any fill so we must
 	; padd memory out to the base location of CP/M
 	ds	CPM_BASE-$,0xff
-
 
 ;##########################################################################
 ;
