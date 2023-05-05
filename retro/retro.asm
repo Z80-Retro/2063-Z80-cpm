@@ -322,11 +322,14 @@ if .debug >= 3
 	call	hexdump
 endif
 
-if 0
-	; This is not quite right because it include the user number and
-	; can get us stuck re-selesting an invalid disk drive!
-	ld	a,(4)		; load the current disk # from page-zero into a/c
-	and	0x0f		; the drive number is in the 4 lsbs
+if 1
+	ld	c,0		; default = drive A (if previous was invalid)
+	ld	a,(4)           ; load the current disk # from page-zero into A
+	and	0x0f            ; the drive number is in the 4 lsbs
+	cp	dph_vec_num
+	jp	nc,CPM_BASE     ; if A >= dph_vec_num then bad drive (use 0)
+
+	ld	a,(4)           ; load the current disk # from page-zero into a/c
 	ld	c,a
 else
 	ld	c,0		; The ONLY valid drive WE have is A!

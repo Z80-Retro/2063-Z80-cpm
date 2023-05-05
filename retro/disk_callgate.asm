@@ -77,17 +77,19 @@ endif
 ;****************************************************************************
 ;****************************************************************************
 disk_seldsk:
-        ld      a,c
-        ld      (disk_disk),a
 
 if .disk_debug >= 2
+	push	bc
 	call    iputs
 	db	"disk_seldsk entered\r\n\0"
-	ld	a,(disk_disk)		; restore the drive number
+	pop	bc
 endif
 	; check if the disk is valid
+        ld      a,c
 	cp	dph_vec_num
 	jr	nc,.seldsk_fail		; if (a >= dph_vec_num) then error
+
+        ld      (disk_disk),a
 
 	; disk is valid, find the DPH
 	ld	hl,dph_vec		; default = invalid
@@ -183,7 +185,7 @@ if 0
 	call	hexdump	
 endif
 
-	pop	hl
+	pop	hl		; HL = DPH
 	ret
 
 
@@ -193,7 +195,8 @@ endif
 	ld	(disk_dph),hl
 	ld	(.cur_disk_read),hl
 	ld	(.cur_disk_write),hl
-	ret
+
+	ret			; HL = 0 = fail
 
 
 ;****************************************************************************
