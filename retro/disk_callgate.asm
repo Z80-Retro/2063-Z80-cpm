@@ -27,10 +27,12 @@
 
 .disk_debug:	equ	0
 
+
 ;****************************************************************************
 ; For each drive, find the init function from the DPH->DPB and call it.
 ;****************************************************************************
 disk_init:
+
 if .disk_debug >= 1
         call    iputs
         db      "disk_init entered: \0"
@@ -42,6 +44,7 @@ endif
 .init_loop:
 	ld	l,(iy+0)
 	ld	h,(iy+1)		; HL = dph[0]
+	ld	(disk_dph),hl		; set disk_dph in case it is needed
 
 	push	hl
 	pop	ix			; IX = dph[0]
@@ -340,6 +343,14 @@ disk_sec:
 	dw	0		; The current sector
 disk_dph:
 	dw	0		; The DPH of the currently selected disk
+
+
+; When running from a disk/SD, disk_offset_xxx represent the physical
+; address of the starting block number.
+disk_offset_low:
+	dw	0x0800		; backward compatible default block number
+disk_offset_hi:
+	dw	0x0000
 
 
 ;****************************************************************************

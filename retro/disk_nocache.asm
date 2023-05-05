@@ -365,6 +365,20 @@ endif
 	ld	e,l
 	ld	d,h
 	pop	hl
+
+	; add the partition offset
+	ld	a,(disk_offset_low)
+	add	l
+	ld	l,a
+	ld	a,(disk_offset_low+1)
+	adc	a,h			; cy flag still set from prior add
+	ld	h,a
+	ld	a,(disk_offset_hi)
+	adc	a,e
+	ld	e,a
+	ld	a,(disk_offset_hi+1)
+	adc	a,d
+	ld	d,a
 	ret
 
 
@@ -391,7 +405,7 @@ endif
 	ld	a,1
 	ld	(.sdbuf_val),a	; mark .sdbuf_trk as invalid
 
-        ret
+	ret
 
 
 ;##########################################################################
@@ -439,7 +453,7 @@ nocache_dph:	macro	sdblk_hi sdblk_lo
 	dw	nocache_dpb	; +10 DPB pointer
 	dw	0		; +12 CSV pointer (optional, not implemented)
 	dw	.alv		; +14 ALV pointer
-	dw	sdblk_lo	; +16	32-bit starting SD card block number
+	dw	sdblk_lo	; +16	32-bit starting SD card block offset
 	dw	sdblk_hi	; +18
 
 .alv:	ds	0
