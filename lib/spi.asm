@@ -43,43 +43,48 @@
 ; of the GP Output port and that SSEL is low.
 ; This will leave: CLK=1, MOSI=(the LSB of the byte written)
 ; Clobbers: A, D
+; Refactored by Tim Gordon and Trevor Jacobs 06-02-2023 
 ;############################################################################
-spi_write1:	macro	bitpos
-	ld	a,d			; a = gpio_out value w/CLK & MOSI = 0
-	bit	bitpos,c		; [8] is the bit of C a 1?
-	jr	z,.lo_bit		; [7/12] (transmit a 0)
-	or	gpio_out_sd_mosi	; [7] prepare to transmit a 1 (only [4] if mask is in a reg)
-.lo_bit: ds 0				; for some reason, these labels disappear if there is no neumonic
-	out	(gpio_out),a		; set data value & CLK falling edge
-	or	gpio_out_sd_clk		; ready the CLK to send a 1
-	out	(gpio_out),a		; set the CLK's rising edge
+
+;If shifting carry into a's lsb by using "adc b":
+spi_write1: macro
+		ld a, d			; Restore gpio port bits ready for clock and data 4
+		rl c			; Isolate next data bit 8
+		adc a,l                 ; Put data bit into lsb by adding 0 with carry. Do it fast by storing 0 in reg l 4
+		out (gpio_out), a	; Drive MOSI and CLK signal onto SPI bus 11
+		or h			; Set CLK high.  Do it fast by ORing reg 4
+		out (gpio_out), a	; Drive MOSI and other CLK edge	11
 	endm
+;T: 42 clocks/bit = 33.6us/byte + overhead (24% improvement)
+;NOTE: must preload reg l with 0 and h with gpio_out_sd_clk
 
 spi_write8:
-	ld	a,(gpio_out_cache)	; get current gpio_out value
-	and	0+~(gpio_out_sd_mosi|gpio_out_sd_clk)	; MOSI & CLK = 0
-	ld	d,a			; save in D for reuse
+	push hl				; Do expensive push in order to realize fast register usage 11
+	
+	ld h, gpio_out_sd_clk		; Initialize CLK bit mask 7
+	ld l, 0				; Initialize for fast data bit set 7
 
-	;--------- bit 7
-	; special case for the first bit (a already has the gpio_out value)
-	bit	7,c			; check the value of the bit to send
-	jr	z,.spi_lo7		; if sending 0, then A is already prepared
-	or	gpio_out_sd_mosi	; else set the bit to send to 1
-.spi_lo7:
-	out	(gpio_out),a		; set data value & CLK falling edge together
-	or	gpio_out_sd_clk		; ready the CLK to send a 1
-	out	(gpio_out),a		; set the CLK's rising edge
+	;di				; Start of critical section
+	
+	ld a,(gpio_out_cache)		; Get current gpio_out value 13
+	and	0+~(gpio_out_sd_mosi|gpio_out_sd_clk)	; Set MOSI & CLK = 0 7
+	ld d, a						; Save in register for reuse each bit 4
+	
+	spi_write1 ;7 42
+	spi_write1 ;6
+	spi_write1 ;5
+	spi_write1 ;4
+	spi_write1 ;3
+	spi_write1 ;2
+	spi_write1 ;1
+	spi_write1 ;0
+	
+	;ei				; End of critical section
 
-	; send the other 7 bits
-	spi_write1	6
-	spi_write1	5
-	spi_write1	4
-	spi_write1	3
-	spi_write1	2
-	spi_write1	1
-	spi_write1	0
-
-	ret
+	pop hl                          ; 10
+       
+	ret				; 10
+;T: 69+42*8 = 405 cycles/byte = 40.5us/byte = ~24.7kB/s
 
 ;############################################################################
 ; Read 8 bits from the SPI & return it in A.
@@ -87,44 +92,56 @@ spi_write8:
 ; This will leave: CLK=1, MOSI=1
 ; Clobbers A, D and E
 ; Returns the byte read in the A (and a copy of it also in E)
+; Refactored by Tim Gordon and Trevor Jacobs 06-02-2023 
 ;############################################################################
-spi_read1:	macro
-	ld	a,d
-	out	(gpio_out),a		; set data value & CLK falling edge
-	or	gpio_out_sd_clk		; set the CLK bit
-	out	(gpio_out),a		; CLK rising edge
 
-	in	a,(gpio_in)		; read MISO
-	and	gpio_in_sd_miso		; strip all but the MISO bit 
-	or	e			; accumulate the current MISO value
-	rlca				; The LSB is read last, rotate into proper place 
-					; NOTE: note this only works because gpio_in_sd_miso = 0x80
-	ld	e,a			; save a copy of the running value in A and E
+;Using precalculated bit patterns for gpio_out (I saw PoE do this):
+spi_read1: macro
+	out	(c), h			; Drive MOSI high and CLK low.  Do it fast by using register 12
+	out	(c), l			; Drive MOSI HIGH and CLK high 12
+	in	a, (gpio_in)		; Read MISO (in bit 7) 11
+	rla					; Put MISO value in carry 4
+	rl e				; Shift carry (= MISO bit) into bit 0 of reg e 8
 	endm
-
-;XXX consider moving this per-byte overhead into the caller????    XXX
+;T: 47 clocks/bit = 37.6us/byte (~30% improvement)
+;NOTE: Must preload b and c registers with gpio_out_cache and correct MISO and CLK levels (and make sure this doesn't affect spi_read call)
+;NOTE: There's no reason to even initialize the e register because 8 left rotates will leave all bits updated correctly
 
 spi_read8:
-	ld	e,0			; prepare to accumulate the bits into E
+	push hl
+	push bc				; Push unclobbered registers onto stack.  Slow operation in order to accelerate bit code 22
 
-	ld	a,(gpio_out_cache)	; get current gpio_out value
-	and	~gpio_out_sd_clk	; CLK = 0
-	or	gpio_out_sd_mosi	; MOSI = 1
-	ld	d,a			; save in D for reuse
+	ld c, gpio_out			; Load gpio port address into c reg 7
+	ld e, 0				; Prepare to accumulate the bits into e reg 7
+	
+	;di				; Start of critical section
+	
+	ld	a, (gpio_out_cache)	; Get current gpio_out value 13
+	and	~gpio_out_sd_clk	; Clear CLK bit	7
+	or	gpio_out_sd_mosi	; Set MOSI bit 7
+	ld h, a				; Store for fast use 4
+	or	gpio_out_sd_clk		; Set CLK bit 7
+	ld l, a				; Store for fast use 4
+	
+	spi_read1 ;7		        ; Read the 8 bits 51
+	spi_read1 ;6
+	spi_read1 ;5
+	spi_read1 ;4
+	spi_read1 ;3
+	spi_read1 ;2
+	spi_read1 ;1
+	spi_read1 ;0
 
-	; read the 8 bits
-	spi_read1	;7
-	spi_read1	;6
-	spi_read1	;5
-	spi_read1	;4
-	spi_read1	;3
-	spi_read1	;2
-	spi_read1	;1
-	spi_read1	;0
+	;ei				; End of critical section
+	
+	ld a, e				; Final transfer accumulated byte to a reg 4
+					; The final value will be in both the E and A registers
+	pop bc				; 20
+	pop hl
+	
+	ret				; 10
 
-	; The final value will be in both the E and A registers
-
-	ret
+;T: 108+47*8 = 484 cycles/byte = 48.4us/byte = ~20.7kB/s
 
 ;##############################################################
 ; Assert the select line (set it low)
