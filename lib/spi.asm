@@ -80,74 +80,74 @@
 ;
 ;############################################################################
 
-spi_write1: macro	; 42 cycles / bit
-		ld a, e					; Restore gpio port bits ready for clock and data	4
-		rl c					; Isolate next data bit						8
-		rla						; Put data bit into lsb by rotating in		4
-		out (gpio_out), a		; Drive MOSI and CLK = 0 signal onto SPI bus	11
-		or d					; Set CLK high.  Do it fast by ORing reg	4
-		out (gpio_out), a		; Drive MOSI and other CLK rising edge		11
-	endm
+spi_write1: macro   ; 42 cycles / bit
+        ld a, e                 ; Restore gpio port bits ready for clock and data   4
+        rl c                    ; Isolate next data bit                     8
+        rla                     ; Put data bit into lsb by rotating in      4
+        out (gpio_out), a       ; Drive MOSI and CLK = 0 signal onto SPI bus    11
+        or d                    ; Set CLK high.  Do it fast by ORing reg    4
+        out (gpio_out), a       ; Drive MOSI and other CLK rising edge      11
+    endm
 
-spi_write_str:		; hl has read buffer pointer, bc has count
-	push de
-	push bc
-	push hl
-		
-	ld a, c						; Swap b for c in order to use djnz inst
-	or a						; Adjust outer loop count when inner loop is 00
-	jr nz, .write_correct_count
-		dec b
-.write_correct_count:			; * The extra time taken here is miniscule compared to 
-	ld c, b						; the inner loop; it is once per call so worth it
-	ld b, 0						; Preload inner loop count with 0 for next outer loop 
-	push bc						; Save bc for outer loop use
-	ld b, a						; First inner loop count in b for djnz
+spi_write_str:      ; hl has read buffer pointer, bc has count
+    push de
+    push bc
+    push hl
+        
+    ld a, c                     ; Swap b for c in order to use djnz inst
+    or a                        ; Adjust outer loop count when inner loop is 00
+    jr nz, .write_correct_count
+        dec b
+.write_correct_count:           ; * The extra time taken here is miniscule compared to 
+    ld c, b                     ; the inner loop; it is once per call so worth it
+    ld b, 0                     ; Preload inner loop count with 0 for next outer loop 
+    push bc                     ; Save bc for outer loop use
+    ld b, a                     ; First inner loop count in b for djnz
 
-	ld d, gpio_out_sd_clk		; Initialize CLK = 1 bit mask			7
+    ld d, gpio_out_sd_clk       ; Initialize CLK = 1 bit mask           7
 
-	ld a, (gpio_out_cache)		; Get current gpio_out value- CLK will = 0 and MOSI will = 1	13
-			; TG 071623 Changed to just clear MOSI because idle state of CLK is already 0
-	and ~gpio_out_sd_mosi		; Set MOSI (& CLK) = 0	7
-	rra							; Right shift now to accept left shift of data bit	4
-	ld e, a						; Save in register for reuse each bit	4
+    ld a, (gpio_out_cache)      ; Get current gpio_out value- CLK will = 0 and MOSI will = 1    13
+            ; TG 071623 Changed to just clear MOSI because idle state of CLK is already 0
+    and ~gpio_out_sd_mosi       ; Set MOSI (& CLK) = 0  7
+    rra                         ; Right shift now to accept left shift of data bit  4
+    ld e, a                     ; Save in register for reuse each bit   4
 
 .write_str_loop:
-			ld c, (hl)			; Fetch byte from write buffer			7
-			inc hl				; Increment buffer pointer				6
+            ld c, (hl)          ; Fetch byte from write buffer          7
+            inc hl              ; Increment buffer pointer              6
 
-			di					; Critical section start
-			spi_write1	;7		; Write 8 bits							42 * 8 = 336
-			spi_write1	;6		; Inlining this saves call and ret cycles
-			spi_write1	;5
-			spi_write1	;4
-			spi_write1	;3
-			spi_write1	;2
-			spi_write1	;1
-			spi_write1	;0
-			ei					; Critical section end
-		
-			djnz .write_str_loop	; Loop count.LSB first, 256 thereafter	13/7
+            di                  ; Critical section start
+            spi_write1  ;7      ; Write 8 bits                          42 * 8 = 336
+            spi_write1  ;6      ; Inlining this saves call and ret cycles
+            spi_write1  ;5
+            spi_write1  ;4
+            spi_write1  ;3
+            spi_write1  ;2
+            spi_write1  ;1
+            spi_write1  ;0
+            ei                  ; Critical section end
+        
+            djnz .write_str_loop    ; Loop count.LSB first, 256 thereafter  13/7
 
-		pop bc					; Restore loop count					11
-		dec c					; Outer loop -1							4
-		push bc					; Store for next time					10
-		jp p, .write_str_loop	; Outer loop until c goes -ve		10 (7)
+        pop bc                  ; Restore loop count                    11
+        dec c                   ; Outer loop -1                         4
+        push bc                 ; Store for next time                   10
+        jp p, .write_str_loop   ; Outer loop until c goes -ve       10 (7)
 
 .write_str_done:
-			; a still has last bit pattern driven to bus
-	and ~gpio_out_sd_clk
-	or gpio_out_sd_mosi			; Drive SPI lines back to idle state CLK = 0, MOSI = 1
-	
-	out (gpio_out), a			; Leave pins at idle states.  No need to write to cache
-								; ...because SPI bits in cache should already be in idle states
-	pop bc
-	
-	pop hl
-	pop bc
-	pop de
-	
-	ret
+            ; a still has last bit pattern driven to bus
+    and ~gpio_out_sd_clk
+    or gpio_out_sd_mosi         ; Drive SPI lines back to idle state CLK = 0, MOSI = 1
+    
+    out (gpio_out), a           ; Leave pins at idle states.  No need to write to cache
+                                ; ...because SPI bits in cache should already be in idle states
+    pop bc
+    
+    pop hl
+    pop bc
+    pop de
+    
+    ret
 
 
 ;############################################################################
@@ -163,20 +163,20 @@ spi_write_str:		; hl has read buffer pointer, bc has count
 ;
 ;############################################################################
 
-spi_write8:					; Write the byte passed in c 
-	push hl
-	push bc
-	
-	ld hl, .spi_8_scratch
-	ld (hl), c
-	ld bc, 1
-	
-	call spi_write_str
-	
-	pop bc
-	pop hl
-	
-	ret
+spi_write8:                 ; Write the byte passed in c 
+    push hl
+    push bc
+    
+    ld hl, .spi_8_scratch
+    ld (hl), c
+    ld bc, 1
+    
+    call spi_write_str
+    
+    pop bc
+    pop hl
+    
+    ret
 
 
 ;############################################################################
@@ -216,80 +216,80 @@ spi_write8:					; Write the byte passed in c
 ;############################################################################
 
 spi_read1: macro
-		in a, (gpio_in)			; Read MISO (in bit 7)				11
-		out (c), d				; Drive MOSI HIGH and CLK high		12
-		rla						; Put MISO value in carry			4
-		rl e					; Shift carry (= MISO bit) into bit 0 of reg e	8
-		out (c), b				; Drive MOSI high and CLK low.  Do it fast by using register	12
-	endm
+        in a, (gpio_in)         ; Read MISO (in bit 7)              11
+        out (c), d              ; Drive MOSI HIGH and CLK high      12
+        rla                     ; Put MISO value in carry           4
+        rl e                    ; Shift carry (= MISO bit) into bit 0 of reg e  8
+        out (c), b              ; Drive MOSI high and CLK low.  Do it fast by using register    12
+    endm
 
-spi_read_str:		; hl has read buffer pointer, bc has count
-	push de						; For restoration later
-	push bc
-	push hl
-	
-	ld a, c
-	or a
-	jr nz, .read_correct_count
-		dec b					; Adjust outer loop count if inner is 256
+spi_read_str:       ; hl has read buffer pointer, bc has count
+    push de                     ; For restoration later
+    push bc
+    push hl
+    
+    ld a, c
+    or a
+    jr nz, .read_correct_count
+        dec b                   ; Adjust outer loop count if inner is 256
 .read_correct_count:
-	ld c, b						; Corrected outer loop count in c
-	ld b, a						; Inside loop initial count in b	
-	
-	exx							; Go into one bit register context (BC, DE and HL)
-	push bc						; Store previous state of alternate registers
-	push de						; Alt hl register not used so no need to save
-	
-	ld a, (gpio_out_cache)		; Get current gpio_out value (CLK = 0, MOSI = 1)	13
-			; TG 071623 Not needed because idle state of lines is CLK = 0 and MOSI = 1
-	ld b, a						; Store bitmap in b
-	or gpio_out_sd_clk			; Set CLK bit							7
-	ld d, a						; Store bitmap in d
+    ld c, b                     ; Corrected outer loop count in c
+    ld b, a                     ; Inside loop initial count in b    
+    
+    exx                         ; Go into one bit register context (BC, DE and HL)
+    push bc                     ; Store previous state of alternate registers
+    push de                     ; Alt hl register not used so no need to save
+    
+    ld a, (gpio_out_cache)      ; Get current gpio_out value (CLK = 0, MOSI = 1)    13
+            ; TG 071623 Not needed because idle state of lines is CLK = 0 and MOSI = 1
+    ld b, a                     ; Store bitmap in b
+    or gpio_out_sd_clk          ; Set CLK bit                           7
+    ld d, a                     ; Store bitmap in d
 
-	ld c, gpio_out				; Set up c for fast IO ops				7
-	exx
-			; Inner and outer loop boundary
-.read_str_loop:					; No need to zero out reg e; 8 shifts eliminates previous contents
-		exx						; Enter one-bit context					4
-		
-		spi_read1	;7			; Read the 8 bits, byte in reg e		47 * 8 = 376
-		spi_read1	;6			; Unrolling this saves call and ret cycles!
-		spi_read1	;5
-		spi_read1	;4
-		spi_read1	;3
-		spi_read1	;2
-		spi_read1	;1
-		spi_read1	;0
-		ld a, e					; Put result in a						4
-		
-		exx						; Flip out of one-bit context			4
-		
-		ld (hl), a				; Store in read buffer					7
-		inc hl					; Increment read buffer pointer			6
+    ld c, gpio_out              ; Set up c for fast IO ops              7
+    exx
+            ; Inner and outer loop boundary
+.read_str_loop:                 ; No need to zero out reg e; 8 shifts eliminates previous contents
+        exx                     ; Enter one-bit context                 4
+        
+        spi_read1   ;7          ; Read the 8 bits, byte in reg e        47 * 8 = 376
+        spi_read1   ;6          ; Unrolling this saves call and ret cycles!
+        spi_read1   ;5
+        spi_read1   ;4
+        spi_read1   ;3
+        spi_read1   ;2
+        spi_read1   ;1
+        spi_read1   ;0
+        ld a, e                 ; Put result in a                       4
+        
+        exx                     ; Flip out of one-bit context           4
+        
+        ld (hl), a              ; Store in read buffer                  7
+        inc hl                  ; Increment read buffer pointer         6
 
-		djnz .read_str_loop		; Loop count.LSB first, 256 thereafter	13
-			
-			; Inner loop boundary
-								; If inner loop count zero, 
-		dec c					; Outer loop -1							4
-		jp p, .read_str_loop	; Outer loop until c goes -ve		10 (7)
-		
-			; Outer loop boundary
-			
+        djnz .read_str_loop     ; Loop count.LSB first, 256 thereafter  13
+            
+            ; Inner loop boundary
+                                ; If inner loop count zero, 
+        dec c                   ; Outer loop -1                         4
+        jp p, .read_str_loop    ; Outer loop until c goes -ve       10 (7)
+        
+            ; Outer loop boundary
+            
 .read_str_done:
 
-	exx							; c still has gpio port, and b still has "idle" SPI bus state
-	pop de
-	pop bc
-	exx
-	
-	pop hl
-	pop bc
-	pop de
-	
- 	ld e, a						; Put last byte assembled into reg e now
+    exx                         ; c still has gpio port, and b still has "idle" SPI bus state
+    pop de
+    pop bc
+    exx
+    
+    pop hl
+    pop bc
+    pop de
+    
+    ld e, a                     ; Put last byte assembled into reg e now
 
-	ret
+    ret
 
 
 ;############################################################################
@@ -301,21 +301,21 @@ spi_read_str:		; hl has read buffer pointer, bc has count
 ; Refactored by Tim Gordon and Trevor Jacobs 06-02-2023 
 ;############################################################################
 
-spi_read8:				; Read one byte and return in a and e
-	push hl
-	push bc
-	
-	ld bc, 1
-	ld hl, .spi_8_scratch
-	call spi_read_str
-	
-	pop bc
-	pop hl
-	
-	ret
-	
-.spi_8_scratch:		ds 1
-	
+spi_read8:              ; Read one byte and return in a and e
+    push hl
+    push bc
+    
+    ld bc, 1
+    ld hl, .spi_8_scratch
+    call spi_read_str
+    
+    pop bc
+    pop hl
+    
+    ret
+    
+.spi_8_scratch:     ds 1
+    
 
 ;##############################################################
 ; Assert the select line (set it low)
@@ -367,37 +367,37 @@ spi_read8:				; Read one byte and return in a and e
 ; 
 ;##############################################################
 
-spi_ssel_true:	
-	push de
-	
-	; read and discard a byte to generate 8 clk cycles
-	call spi_read8					; Create 8 CLK pulses- won't hurt anything
+spi_ssel_true:  
+    push de
+    
+    ; read and discard a byte to generate 8 clk cycles
+    call spi_read8                  ; Create 8 CLK pulses- won't hurt anything
 
-	ld a, (gpio_out_cache)
+    ld a, (gpio_out_cache)
 
-			; TG 071623 We make sure idle state of pins is CLK = 0 and MOSI = 1, so no need to do it here
-;	and	~gpio_out_sd_clk			; CLK = 0
-;	or gpio_out_sd_mosi				; MOSI = 1 (required because previous write can leave data line low)	
-;	out (gpio_out), a
+            ; TG 071623 We make sure idle state of pins is CLK = 0 and MOSI = 1, so no need to do it here
+;   and ~gpio_out_sd_clk            ; CLK = 0
+;   or gpio_out_sd_mosi             ; MOSI = 1 (required because previous write can leave data line low)    
+;   out (gpio_out), a
 
-	; enable the card
-	and ~gpio_out_sd_ssel			; SSEL = 0
-	
-			; Even though this is a critical section, no need to disbale ints because ISR would set new SSEL 
-			; level anyway.  After returns, the out () will happen and write the same again- no problem!
-	ld	(gpio_out_cache), a			; Store port in cache because SSEL has changed
-	out (gpio_out), a
-	
-	; Generate clk cycles until not busy (in case sdcard.asm
-	;	doesn't wait for long-duration writes to complete)
+    ; enable the card
+    and ~gpio_out_sd_ssel           ; SSEL = 0
+    
+            ; Even though this is a critical section, no need to disbale ints because ISR would set new SSEL 
+            ; level anyway.  After returns, the out () will happen and write the same again- no problem!
+    ld  (gpio_out_cache), a         ; Store port in cache because SSEL has changed
+    out (gpio_out), a
+    
+    ; Generate clk cycles until not busy (in case sdcard.asm
+    ;   doesn't wait for long-duration writes to complete)
 .spi_ssel_true_busy:
-	call spi_read8
-	cp 0ffh
-	jr nz, .spi_ssel_true_busy
-	
-	pop de
-	
-	ret
+    call spi_read8
+    cp 0ffh
+    jr nz, .spi_ssel_true_busy
+    
+    pop de
+    
+    ret
 
 
 ;##############################################################
@@ -407,7 +407,7 @@ spi_ssel_true:
 ; Clobbers A
 ;
 ; See section 4 of 
-;	Physical Layer Simplified Specification Version 8.00
+;   Physical Layer Simplified Specification Version 8.00
 ; Refactored 061623 TG
 ; This function is special because SSEL is changed and the 
 ; gpio_out_cache value needs to remember the new state.  All
@@ -431,29 +431,29 @@ spi_ssel_true:
 ;##############################################################
 
 spi_ssel_false:
-	push de
-	
-	; read and discard a byte to generate 8 clk cycles
-	call spi_read8					; This meets the need for 8 clocks after
+    push de
+    
+    ; read and discard a byte to generate 8 clk cycles
+    call spi_read8                  ; This meets the need for 8 clocks after
 
-	ld	a, (gpio_out_cache)
+    ld  a, (gpio_out_cache)
 
-			; TG 071623 We make sure idle state of pins is CLK = 0 and MOSI = 1, so no need to do it here
-;	and	~gpio_out_sd_clk			; CLK = 0
-;	or gpio_out_sd_mosi				; MOSI = 1 (required because previous write can leave data line low)
-;	out	(gpio_out), a
+            ; TG 071623 We make sure idle state of pins is CLK = 0 and MOSI = 1, so no need to do it here
+;   and ~gpio_out_sd_clk            ; CLK = 0
+;   or gpio_out_sd_mosi             ; MOSI = 1 (required because previous write can leave data line low)
+;   out (gpio_out), a
 
-	or gpio_out_sd_ssel				; SSEL = 1
-	
-			; Even though this is a critical section, no need to disbale ints because ISR would set new SSEL 
-			; level anyway.  After returns, the out () will happen and write the same again- no problem!
-	ld	(gpio_out_cache), a			; Store port in cache because SSEL has changed.
-	out	(gpio_out), a
+    or gpio_out_sd_ssel             ; SSEL = 1
+    
+            ; Even though this is a critical section, no need to disbale ints because ISR would set new SSEL 
+            ; level anyway.  After returns, the out () will happen and write the same again- no problem!
+    ld  (gpio_out_cache), a         ; Store port in cache because SSEL has changed.
+    out (gpio_out), a
 
-	; generate another 16 clk cycles
-	call spi_read8
-	call spi_read8
-	
-	pop de
-	
-	ret
+    ; generate another 16 clk cycles
+    call spi_read8
+    call spi_read8
+    
+    pop de
+    
+    ret
