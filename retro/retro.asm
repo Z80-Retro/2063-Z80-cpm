@@ -150,7 +150,9 @@ SECTRN: JP      disk_sectrn
 
 .bios_boot:
 	; This will select low-bank E, idle the SD card, and idle the printer
-	ld	a,gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
+	; TG 071723 set "idle" state of SPI lines to CLK = 0 and MOSI = 1
+;	ld	a,gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
+	ld	a,gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
 	ld	(gpio_out_cache),a
 	out	(gpio_out),a
 

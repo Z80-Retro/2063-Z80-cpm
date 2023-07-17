@@ -74,15 +74,18 @@
 ;
 ; Read bytes until we find one with MSB = 0 or bail out retrying.
 ; Return last read byte in A (and a copy also in E)
-; Calls spi_read_str (see for clobbers)
+; Calls spi_read8 (see for clobbers)
 ; Clobbers A, B
 ;############################################################################
+
 .sd_read_r1:
 	push hl
 	ld	b,0xf0		; B = number of retries
 	
 .sd_r1_loop:
 	call spi_read8	; read a byte into A (and a copy in E as well)
+
+; COMMENT or 0x80 and test for minus sign, then no need to ld a from e later?
 
 	and	0x80		; Is the MSB set to 1?
 	jr	z,.sd_r1_done	; If MSB=0 then we are done
@@ -100,7 +103,7 @@
 ; NOTE: Response message formats in SPI mode are different than in SD mode.
 ;
 ; Read an R7 message into the 5-byte buffer pointed to by HL.
-; Clobbers A, BC, DE, HL
+; Clobbers A and E
 ;############################################################################
 
 .sd_read_r7:
@@ -118,7 +121,7 @@
 ; SSEL = HI (deassert)
 ; wait at least 1 msec after power up
 ; send at least 74 (80) SCLK rising edges
-; Clobbers A, DE, B
+; Clobbers A, E
 ;############################################################################
 
 sd_boot:
@@ -133,8 +136,8 @@ sd_boot:
 ;############################################################################
 ; Send a command and read an R1 response message.
 ; HL = command buffer address
-; B = command byte length
-; Clobbers A, BC, DE, HL
+; BC = command byte length
+; Clobbers A, E
 ; Returns A = reply message byte
 ;
 ; Modus operandi
@@ -149,18 +152,23 @@ sd_boot:
 ; read reply
 ; SSEL = HI
 ;############################################################################
+
 .sd_cmd_r1:
 	; assert the SSEL line
-	call    spi_ssel_true
+	call    spi_ssel_true		; Does not clobber hl or bc
 
 	; write a sequence of bytes represending the CMD message
 	call    spi_write_str		; write BC bytes from HL buffer @
 
 	; read the R1 response message
-	call    .sd_read_r1		; A = E = message response byte
-
+	call    .sd_read_r1			; A = E = message response byte
+	
+	push af						; Save response byte 
+	
 	; de-assert the SSEL line
-	call    spi_ssel_false		; All registers are preserved, so a will still be valid
+	call    spi_ssel_false		; This blows up a 
+	
+	pop af						; Restore response byte
 	
 	ret
 
@@ -169,19 +177,20 @@ sd_boot:
 ; Send a command and read an R7 response message.
 ; Note that an R3 response is the same size, so can use the same code.
 ; HL = command buffer address
-; B = command byte length
+; BC = command byte length
 ; DE = 5-byte response buffer address
-; Clobbers A, BC, DE, HL
+; Clobbers A, E
 ;############################################################################
+
 .sd_cmd_r3:
 .sd_cmd_r7:
-	call    spi_ssel_true
+	call    spi_ssel_true		; Doesn't clobber hl or bc
 
-	push	de			; save the response buffer @
-	call    spi_write_str		; write cmd buffer from HL, length=B
+	push	de					; save the response buffer @
+	call    spi_write_str		; write cmd buffer from HL, length=BC
 
 	; read the response message into buffer @ in HL
-	pop	hl			; pop the response buffer @ HL
+	pop	hl						; pop the response buffer @ HL
 	call    .sd_read_r7
 
 	; de-assert the SSEL line
@@ -199,7 +208,7 @@ sd_boot:
 ; 3) Enter the IDLE state.
 ;
 ; Return the response byte in A.
-; Clobbers A, BC, DE, HL
+; Clobbers A, E
 ;############################################################################
 sd_cmd0:
 	ld	hl,.sd_cmd0_buf		; HL = command buffer
@@ -242,7 +251,7 @@ endif
 ; Establishing V2.0 of the SD spec enables the HCS bit in 
 ; ACMD41 and CCS bit in CMD58.
 ;
-; Clobbers A, BC, DE, HL
+; Clobbers A, E
 ; Return the 5-byte response in the buffer pointed to by DE.
 ; The response should be: 0x01 0x00 0x00 0x01 0xAA.
 ;############################################################################
@@ -281,7 +290,7 @@ endif
 ; Send a CMD58 message and read an R3 response.
 ; CMD58 is used to ask the card what voltages it supports and
 ; if it is an SDHC/SDXC card or not.
-; Clobbers A, BC, DE, HL
+; Clobbers A, E
 ; Return the 5-byte response in the buffer pointed to by DE.
 ;############################################################################
 sd_cmd58:
@@ -318,7 +327,7 @@ endif
 ; Send a CMD55 (APP_CMD) message and read an R1 response.
 ; CMD55 is used to notify the card that the following message is an ACMD 
 ; (as opposed to a regular CMD.)
-; Clobbers A, BC, DE, HL
+; Clobbers A, E
 ; Return the 1-byte response in A
 ;############################################################################
 sd_cmd55:
@@ -356,7 +365,7 @@ endif
 ; that data blocks may be read and written.  It can fail if the card
 ; is not happy with the operating voltage.
 ;
-; Clobbers A, BC, DE, HL
+; Clobbers A, E
 ; Note that A-commands are prefixed with a CMD55.
 ;############################################################################
 sd_acmd41:
@@ -522,16 +531,16 @@ if .sd_debug_cmd17
 endif
 
 	; assert the SSEL line
-	call    spi_ssel_true
+	call    spi_ssel_true		; Doesn't bugger up de
 
 	; send the command 
 	push	iy
 	pop	hl			; HL = IY = cmd_buffer address
 	ld	bc,6			; B = command buffer length
-	call    spi_write_str		; clobbers A, BC, D, HL
+	call    spi_write_str		; clobbers A, E
 
 	; read the R1 response message
-	call    .sd_read_r1		; clobbers A, B, DE
+	call    .sd_read_r1		; clobbers A, E
 
 if .sd_debug_cmd17
 	push	af
@@ -594,7 +603,11 @@ endif
 	push	hl			; and keep the stack level the same
 	ld	bc,0x200		; 512 bytes to read
 ;.sd_cmd17_blk:
-	call	spi_read_str		; Clobbers A, DE
+	call	spi_read_str		; Clobbers A, E
+	
+			; TG 071723 Loop moved into read_str function.  Per-byte
+			; debug print no longer meaningful here, but not added to
+			; SPI file either
 ;	ld	(hl),a
 ;	inc	hl			; increment the buffer pointer
 ;	dec	bc			; decrement the byte counter
@@ -625,8 +638,7 @@ endif
 	call	spi_read8		; read the CRC value (XXX should check this)
 	call	spi_read8		; read the CRC value (XXX should check this)
 
-	; TG Dummy 8 clock according to spec
-	
+	; TG Dummy 8 clock according to spec in ssel_false function
 	call    spi_ssel_false
 	
 	xor	a			; A = 0 = success!
@@ -727,10 +739,10 @@ endif
 	push	iy
 	pop	hl			; hl = iy = &cmd_buffer
 	ld	bc,.sd_cmd24_len
-	call	spi_write_str		; clobbers A, BC, D, HL
+	call	spi_write_str		; clobbers A, E
 
 	; read the R1 response message
-	call    .sd_read_r1		; clobbers A, B, DE
+	call    .sd_read_r1		; clobbers A, E
 
 	; If R1 status != SD_READY (0x00) then error
 	or	a			; if (a == 0x00) 
@@ -749,7 +761,7 @@ endif
 
 .sd_cmd24_r1ok:
 	; give the SD card an extra 8 clocks before we send the start token
-	call spi_read8
+	call spi_read8		; Ignore response
 
 	; send the start token: 0xfe
 	ld	c, 0xfe
@@ -761,6 +773,7 @@ endif
 	ld	h,(ix-5)
 	ld	bc,0x200		; BC = 512 bytes to write
 	call spi_write_str
+			; TG 071723 Loop moved to SPI file for optimization
 ;.sd_cmd24_blk:
 ;	push	bc			; XXX speed this up
 ;	ld	c,(hl)
@@ -776,13 +789,13 @@ endif
 
 	ld	bc,0xf000		; wait a potentially /long/ time for the write to complete
 .sd_cmd24_wdr:				; wait for data response message
-	call	spi_read8		; clobber A, DE
-	cp	0xff
-	jr	nz,.sd_cmd24_drc
-	dec	bc
-	ld	a,b
-	or	c
-	jr	nz,.sd_cmd24_wdr
+		call	spi_read8		; clobber A, DE
+		cp	0xff
+		jr	nz,.sd_cmd24_drc
+		dec	bc
+		ld	a,b
+		or	c
+		jr	nz,.sd_cmd24_wdr
 
 	call    iputs
 	db	"SD CMD24 completion status timeout!\r\n\0"
@@ -795,31 +808,30 @@ endif
 	cp	0x05
 	jr	z,.sd_cmd24_ok
 
+		push	bc
+		call	iputs
+		db	"ERROR: SD CMD24 completion status != 0x05 (count=\0"
+		pop	bc
+		push	bc
+		ld	a,b
+		call	hexdump_a
+		pop	bc
+		ld	a,c
+		call	hexdump_a
+		call	iputs
+		db	")\r\n\0"
 
-	push	bc
-	call	iputs
-	db	"ERROR: SD CMD24 completion status != 0x05 (count=\0"
-	pop	bc
-	push	bc
-	ld	a,b
-	call	hexdump_a
-	pop	bc
-	ld	a,c
-	call	hexdump_a
-	call	iputs
-	db	")\r\n\0"
-
-	jp	.sd_cmd24_err
+		jp	.sd_cmd24_err
 
 .sd_cmd24_ok:
-	
-	; TG Dummy 8 clock here, then code is free to NOT poll for completion?  
+	; TG Dummy 8 clock here, then code is free to NOT poll for completion!  
 	; Not polling here, but checking for busy before the next CMD is issued
-	;	could save some cycles!
+	;	saves some cycles at the expense of detecting failure
 	
 	call	spi_ssel_false
 ;	call spi_read8	; Dummy 8 clocks, just in case the many in the loop aren't enough
 
+			; TG 071723 REVIEWS NOTE COMPLETION CHECK REMOVAL
 if 0
 	; Wait until the card reports that it is not busy
 	call	spi_ssel_true
