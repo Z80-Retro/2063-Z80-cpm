@@ -47,7 +47,7 @@ Do *NOT* expect that you will be able to recover any data after doing this!
 On my raspberry PI, with only one SD adapter plugged into a USB port, I use the 
 following command:
 
-	sudo dd if=/dev/zero of=/dev/sda bs=512 count=10
+	sudo dd if=/dev/zero of=/dev/sda bs=512 count=100 conv=fsync
 
 ## Partition your SD card
 
@@ -120,7 +120,7 @@ At this point, Liunux should recognize that the drive has one partition on it:
 
 If we write "Hello world!" into partition 1:
 
-	echo "Hello world!" | sudo dd of=/dev/sda1 bs=512
+	echo "Hello world!" | sudo dd of=/dev/sda1 bs=512 conv=fsync
 
 ...then we can see it by looking at the raw disk image:
 
