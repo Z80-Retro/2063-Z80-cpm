@@ -1,4 +1,6 @@
-ASM_FLAGS=-I../lib
+TOP=..
+include $(TOP)/Make.default
+
 
 all: retro.bin
 

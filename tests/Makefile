@@ -1,4 +1,5 @@
-ASM_FLAGS=-I../lib
+TOP=..
+include $(TOP)/Make.default
 
 all: spi_test.bin sd_test.bin
 

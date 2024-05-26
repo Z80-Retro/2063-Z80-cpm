@@ -2,7 +2,7 @@
 ;
 ;    Z80 Retro! BIOS 
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2021,2022,2024 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -21,33 +21,6 @@
 ;
 ;
 ;****************************************************************************
-
-;****************************************************************************
-;
-; Memory banks:
-;
-; BANK     Usage
-;   0    SD cache bank 0
-;   1    SD cache bank 1
-;   2    SD cache bank 2
-;   3    SD cache bank 3
-;   4
-;   5
-;   6
-;   7
-;   8
-;   9
-;   A
-;   B
-;   C
-;   D
-;   E    CP/M zero page and low half of the TPA
-;   F    CP/M high half of the TPA, CCP, BDOS, and BIOS
-;
-;****************************************************************************
-
-.low_bank:	equ	0x0e	; The RAM BANK to use for the bottom 32K
-
 
 
 ;##########################################################################
@@ -115,9 +88,9 @@ endif
 BOOT:   JP      .bios_boot
 WBOOT:  JP      .bios_wboot
 CONST:  JP      .bios_const
-CONIN:  JP      .bios_conin
-CONOUT: JP      .bios_conout
-LIST:   JP      .bios_list
+CONIN:  JP      con_rx_char
+CONOUT: JP      con_tx_char
+LIST:   JP      list_out
 PUNCH:  JP      .bios_punch
 READER: JP      .bios_reader
 HOME:   JP      disk_home
@@ -127,7 +100,7 @@ SETSEC: JP      disk_setsec
 SETDMA: JP      disk_setdma
 READ:   JP      disk_read
 WRITE:  JP      disk_write
-PRSTAT: JP      .bios_prstat
+PRSTAT: JP      list_stat
 SECTRN: JP      disk_sectrn
 
 
@@ -150,15 +123,15 @@ SECTRN: JP      disk_sectrn
 
 .bios_boot:
 	; This will select low-bank E, idle the SD card, and idle the printer
-	ld	a,gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
+	ld	a,gpio_out_init
 	ld	(gpio_out_cache),a
 	out	(gpio_out),a
 
 	; make sure we have a viable stack
 	ld	sp,bios_stack		; use the private BIOS stack to get started
 
-	call	.init_console		; Note: console should still be initialized from the boot loader
-	call	.init_list		; initialize the printer interface
+	call	con_init                ; Note: console should still be initialized from the boot loader
+	call	list_init		; initialize the printer interface
 
 if .debug > 0
 	call	iputs
@@ -350,64 +323,6 @@ endif
 	ld	a,0xff
 	ret			; A = 0xff = ready
 
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p17:
-; Read the next console character into register A and set the parity bit
-; (high order bit) to zero.  If no console character is ready, wait until
-; a character is typed before returning.
-;
-;##########################################################################
-.bios_conin:
-if 1
-	jp	con_rx_char
-else
-	; a simple hack to let us dump the dmcache status on demand
-	call	con_rx_char
-	cp	0x1B				; escape key??
-	ret	nz				; if not an escape then return
-	call	z,disk_dmcache_debug_wedge	; else tail-call the debug wedge
-	ld	a,0x1B				; restore the trigger key value
-	ret
-endif
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p18:
-; Send the character from register C to the console output device.  The
-; character is in ASCII, with high order parity bit set to zero.
-;
-;##########################################################################
-.bios_conout:
-	jp	con_tx_char
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p18:
-; Send the character from register C to the currently assigned listing
-; device.  The character is in ASCII with zero parity.
-;
-;##########################################################################
-.bios_list:
-	jp	prn_out		; tail-call the driver output routine
-
-.init_list:
-	jp	prn_init	; tail-call the driver init routine
-
-;##########################################################################
-;
-; CP/M 2.2 Alteration Guide p20:
-; Return the ready status of the list device.  Used by the DESPOOL program
-; to improve console response during its operation.  The value 00 is
-; returned in A of the list device is not ready to accept a character, and
-; 0FFH if a character can be sent to the printer. 
-;
-; Note that a 00 value always suffices.
-;
-; Clobbers AF
-;##########################################################################
-.bios_prstat:
-	jp	prn_stat	; tail-call the driver status routine
 
 ;##########################################################################
 ;
@@ -435,16 +350,6 @@ endif
 	ld	a,0x1a
 	ret
 
-;##########################################################################
-; Initialize the console port.  Note that this includes CTC port 1.
-;##########################################################################
-.init_console:
-	;ld	c,6			; C = 6 = 19200 bps
-	ld	c,12			; C = 12 = 9600 bps
-	call	init_ctc_1		; start CTC1 in case J11-A selects it!
-	call	sioa_init		; 115200 or 19200/9600 depending on J11-A
-	ret
-
 
 ;##########################################################################
 ; Libraries
@@ -452,13 +357,12 @@ endif
 
 include 'disk_callgate.asm'
 
-include 'sio.asm'
-include 'ctc1.asm'
+include 'console.asm'
+include 'list.asm'
 include 'puts.asm'
 include 'hexdump.asm'
 include 'sdcard.asm'
 include 'spi.asm'
-include 'prn.asm'
 
 
 ;##########################################################################
@@ -487,6 +391,5 @@ bios_stack:			; full descending stack starts /after/ the storage area
 if $ < BOOT
 	ERROR THE BIOS WRAPPED AROUND PAST 0xffff
 endif
-
 
 	end

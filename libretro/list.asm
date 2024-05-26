@@ -34,7 +34,7 @@
 ;
 ; Clobbers AF
 ;##########################################################################
-prn_init:
+list_init:
 	ld	a,(gpio_out_cache)
 	or	gpio_out_prn_stb	; make PRN_STB high (false)
 	ld	(gpio_out_cache),a	; save in the cached output value
@@ -46,7 +46,7 @@ prn_init:
 ; Return A=0xff if printer is ready.
 ; Clobbers AF
 ;##########################################################################
-prn_stat:
+list_stat:
 	in	a,(gpio_in)
 	and	gpio_in_prn_bsy		; if this bit is low then it is ready
 	jr	z,.prn_stat_ready
@@ -60,7 +60,7 @@ prn_stat:
 ;##########################################################################
 ; Print the character in the C register.
 ;##########################################################################
-prn_out:
+list_out:
 
 	; Sanity check to prevent seizing the entire OS.
 	; If EVERY printer status input is high, then there is probably no
@@ -75,7 +75,7 @@ prn_out:
 	; wait until the printer is ready for data
 	; XXX this can seize the system if the printer is offline!  :-(
 .list_wait:
-	call	prn_stat
+	call	list_stat
 	or	a
 	jr	z,.list_wait		; if A=0 then is not ready
 

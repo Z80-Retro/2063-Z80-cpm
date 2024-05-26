@@ -126,7 +126,7 @@ siob_rx_char:
 	ld	a,(sio_bd)
 	ret
 
-con_rx_char:
+;con_rx_char:
 sioa_rx_char:
 	call	sioa_rx_ready
 	jr	z,sioa_rx_char

@@ -1,8 +1,8 @@
 SUBDIRS=\
 	boot \
+	retro \
 	tests \
 	hello \
-	retro \
 	filesystem
 
 CLEAN_DIRS=$(SUBDIRS:%=clean-%)
@@ -33,6 +33,8 @@ REL_FILES=\
 	doc \
 	hello \
 	lib \
+	libretro \
+	libnouveau \
 	retro \
 	tests \
 	filesystem/Makefile \

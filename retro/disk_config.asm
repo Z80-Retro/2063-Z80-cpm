@@ -2,8 +2,8 @@
 ; Configure the BIOS drive DPH structures here.
 ;
 ; WARNING
-; 	Do *NOT* expected to mount the same drive more than one 
-;	way and expect it to work without corrupting the drive!
+; 	Do *NOT* expect to mount the same drive more than one 
+;	way without corrupting it!
 ;****************************************************************************
 
 ; Create a DPH & ALV for each filesystem 
