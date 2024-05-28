@@ -21,6 +21,10 @@
 ;
 ;****************************************************************************
 
+
+include 'sio.asm'
+include 'ctc1.asm'
+
 con_init:
         ;ld     c,6                     ; C = 6 = 19200 bps
         ld      c,12                    ; C = 12 = 9600 bps
@@ -50,5 +54,3 @@ con_rx_char:
         ret
 endif
 
-include 'sio.asm'
-include 'ctc1.asm'
