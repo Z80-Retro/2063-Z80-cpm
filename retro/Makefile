@@ -5,7 +5,7 @@ all: retro.bin
 clean:
 	rm -f *.lst *.bin *.hex *.sym 
 
-DATE := $(shell date --rfc-3339=seconds)
+DATE := $(shell date +"%Y-%m-%d %H:%M:%S%z")
 #DATE := "xxx"
 GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
 %.bin: %.asm
