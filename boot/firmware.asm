@@ -1,6 +1,6 @@
 ;****************************************************************************
 ;
-;    Copyright (C) 2021,2022,2023 John Winans
+;    Copyright (C) 2021,2022,2023,2024 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -53,7 +53,7 @@ include	'memory.asm'
 	; NOTE THAT THE SRAM IS NOT READABLE AT THIS POINT
 	;###################################################
 
-	; Select SRAM low bank 14, idle the SD card, and idle printer signals
+	; Select SRAM low bank, idle the SD card, etc.
 	ld	a,(gpio_out_cache)
 	out	(gpio_out),a
 
@@ -73,14 +73,8 @@ include	'memory.asm'
 
 	ld	sp,.stacktop
 
-	; Initialize the CTC so that the SIO will have a baud clock if J11-A is set to the CTC!
-	;ld	c,1			; 115200 bps
-	;ld	c,6			; 19200 bps
-	ld	c,12			; 9600 bps
-	call	init_ctc_1
-
-	; Init the SIO to run at 115200 or at the CTC rate depending on J11-A
-	call	sioa_init
+        call    bsp_init                ; board-specific init
+        call    con_init
 
 	; Display a hello world message.
 	ld	hl,.boot_msg
@@ -100,7 +94,7 @@ include	'memory.asm'
 .boot_msg:
 	db	'\r\n\n'
 	db	'##############################################################################\r\n'
-	db	'Z80 Retro Board 2063.3\r\n'
+	db	'@@BOOT_MSG@@\r\n'
 	db	'      git: @@GIT_VERSION@@\r\n'
 	db	'    build: @@DATE@@\r\n'
 	db	'\0'
@@ -446,17 +440,15 @@ endif
 include	'sdcard.asm'
 include	'spi.asm'
 include	'hexdump.asm'
-include 'sio.asm'
-include 'ctc1.asm'
+include 'console.asm'
 include 'puts.asm'
+include 'bsp.asm'
 
 ;##############################################################################
 ; This is a cache of the last written data to the gpio_out port.
 ; The initial value here is what is written to the latch during startup.
 ;##############################################################################
-.low_bank:      equ     0x0e    ; The RAM BANK to use for the bottom 32K
-gpio_out_cache:	db	gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb|gpio_out_sd_clk|(.low_bank<<4)
-
+gpio_out_cache:	db	gpio_out_init
 
 ;##############################################################################
 ; This marks the end of the data copied from FLASH into RAM during boot

@@ -22,9 +22,11 @@
 
 all::
 
-# optionally include rules from a local file:
-include Make.default
--include Make.local
+
+# Include the detault and any local override rules
+# Must set TOP before including Make.default
+TOP=..
+include $(TOP)/Make.default
 
 .PHONY: all clean world burn blank-all-sd
 

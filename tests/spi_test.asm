@@ -1,6 +1,6 @@
 ;****************************************************************************
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2021,2022,2024 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -51,13 +51,7 @@ stacktop:	equ	0
 
 	ld	sp,stacktop
 
-	; Initialize the CTC so that the SIO will have a baud clock if J11-A is set to the CTC!
-	;ld	c,1			; 115200 bps
-	ld	c,6			; 19200 bps
-	call	init_ctc_1
-
-	; Init the SIO to run at 115200 or 19200 depending on J11-A
-	call	sioa_init
+	call	con_init
 
 	; Display a startup message
 	ld	hl,boot_msg
@@ -225,19 +219,16 @@ test_cmd0_msg:
 
 
 
-
-
 include	'spi.asm'
 include	'hexdump.asm'
-include 'sio.asm'
-include 'ctc1.asm'
+include 'console.asm'
 include 'puts.asm'
 
 ;##############################################################################
 ; This is a cache of the last written data to the gpio_out port.
 ; The initial value here is what is written to the latch during startup.
 ;##############################################################################
-gpio_out_cache:	db	gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb
+gpio_out_cache:	db	gpio_out_init
 
 
 ;##############################################################################

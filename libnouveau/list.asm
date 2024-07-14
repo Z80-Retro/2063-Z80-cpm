@@ -1,6 +1,6 @@
 ;****************************************************************************
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2024 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -17,42 +17,27 @@
 ;    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
 ;    USA
 ;
+; https://github.com/johnwinans/2063-Z80-cpm
+;
 ;****************************************************************************
 
-include	'io.asm'
-include	'memory.asm'
+;##########################################################################
+; Initialize the printer.
+;##########################################################################
+list_init:
+	ret
 
-	org	LOAD_BASE		; the second-stage load address
-
-	ld	sp,LOAD_BASE
-
-	; XXX Note that the boot loader should have initialized the SIO, CTC etc.
-	; XXX Therefore we can just write to them from here.
-
-	ld	de,0
-.loop:
-	; Display a hello world message.
-	inc	de
-	ld	a,d
-	call	hexdump_a
-	ld	a,e
-	call	hexdump_a
-	call	iputs
-	db	": Hello from the SD card!!!\r\n"
-	db	0			; DON'T FORGET the null terminator!
-
-	; waste some time
-	ld	hl,0
-.dly:
-	dec	hl
-	ld	a,h
-	or	l
-	jp	z,.loop			; if done, go back & print again
-	jp	.dly
-
-	; ...we never get here
+;##########################################################################
+; Return A=0 if printer is not ready.
+; Return A=0xff if printer is ready.
+;##########################################################################
+list_stat:
+        ld      a,0xff
+	ret
 
 
-include	'hexdump.asm'
-include 'console.asm'
-include 'puts.asm'
+;##########################################################################
+; Print the character in the C register.
+;##########################################################################
+list_out:
+        ret

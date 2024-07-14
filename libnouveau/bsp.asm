@@ -1,6 +1,6 @@
 ;****************************************************************************
 ;
-;    Copyright (C) 2021,2022 John Winans
+;    Copyright (C) 2024 John Winans
 ;
 ;    This library is free software; you can redistribute it and/or
 ;    modify it under the terms of the GNU Lesser General Public
@@ -17,42 +17,19 @@
 ;    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
 ;    USA
 ;
+; https://github.com/johnwinans/2063-Z80-cpm
+;
 ;****************************************************************************
 
-include	'io.asm'
-include	'memory.asm'
+bsp_init:
+        ld      a,0
+        ;out0     (0x36),a        ; RCR = 0 = disable the DRAM refresh controller
+        db      0xed,0x39,0x36
+        ;out0     (0x32),a        ; DCNTL = 0 = zero wait states
+        db      0xed,0x39,0x32
 
-	org	LOAD_BASE		; the second-stage load address
+        ld      a,0x80
+        ;out0    (0x1f),a        ; CCR = 0x80 = run at 1X extal clock speed
+        db      0xed,0x39,0x1f
 
-	ld	sp,LOAD_BASE
-
-	; XXX Note that the boot loader should have initialized the SIO, CTC etc.
-	; XXX Therefore we can just write to them from here.
-
-	ld	de,0
-.loop:
-	; Display a hello world message.
-	inc	de
-	ld	a,d
-	call	hexdump_a
-	ld	a,e
-	call	hexdump_a
-	call	iputs
-	db	": Hello from the SD card!!!\r\n"
-	db	0			; DON'T FORGET the null terminator!
-
-	; waste some time
-	ld	hl,0
-.dly:
-	dec	hl
-	ld	a,h
-	or	l
-	jp	z,.loop			; if done, go back & print again
-	jp	.dly
-
-	; ...we never get here
-
-
-include	'hexdump.asm'
-include 'console.asm'
-include 'puts.asm'
+        ret

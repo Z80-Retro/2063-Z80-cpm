@@ -245,7 +245,7 @@ endif
 if .nc_debug >= 1
 	call	iputs
 	db	".write cache miss: \0"
-	call	bios_debug_disk
+	call	disk_dump
 endif
 	; Remember drive that is in the cache - Trevor Jacobs - 02-15-2023
 	ld	de,(disk_dph)

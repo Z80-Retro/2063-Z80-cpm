@@ -1,4 +1,5 @@
-ASM_FLAGS=-I../lib
+TOP=..
+include $(TOP)/Make.default
 
 all: spi_test.bin sd_test.bin
 
@@ -6,7 +7,7 @@ clean:
 	rm -f ldr
 	rm -f *.lst *.bin *.hex *.sym
 
-DATE := $(shell date --rfc-3339=seconds)
+DATE := $(shell date +"%Y-%m-%d %H:%M:%S%z")
 GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
 
 %.bin: %.asm
