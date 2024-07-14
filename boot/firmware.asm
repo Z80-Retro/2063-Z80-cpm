@@ -52,23 +52,8 @@ include	'memory.asm'
 	;###################################################
 	; NOTE THAT THE SRAM IS NOT READABLE AT THIS POINT
 	;###################################################
-if 1
-        ld      a,0
-        ;out0     (0x36),a        ; RCR = 0 = disable the DRAM refresh controller
-        db      0xed,0x39,0x36
-        ;out0     (0x32),a        ; DCNTL = 0 = zero wait states
-        db      0xed,0x39,0x32
 
-if 1
-        ; This will require more thought to get the right baud rate different clock speed.
-        ; Either use the BRG or a PLL in the FPGA.
-        ld      a,0x80          
-        ;out0    (0x1f),a        ; CCR = 0x80 = run at 1X extal clock speed
-        db      0xed,0x39,0x1f
-endif
-endif
-
-	; Select SRAM low bank 14, idle the SD card, and idle printer signals
+	; Select SRAM low bank, idle the SD card, etc.
 	ld	a,(gpio_out_cache)
 	out	(gpio_out),a
 
@@ -463,12 +448,7 @@ include 'bsp.asm'
 ; This is a cache of the last written data to the gpio_out port.
 ; The initial value here is what is written to the latch during startup.
 ;##############################################################################
-.low_bank:      equ     0x0e    ; The RAM BANK to use for the bottom 32K
-if 1
-gpio_out_cache:	db	gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_sd_clk|(.low_bank<<4)
-else
-gpio_out_cache:	db	gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb|gpio_out_sd_clk|(.low_bank<<4)
-endif
+gpio_out_cache:	db	gpio_out_init
 
 ;##############################################################################
 ; This marks the end of the data copied from FLASH into RAM during boot
