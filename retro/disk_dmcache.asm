@@ -406,7 +406,7 @@ if .dmcache_debug >= 2
 	push	af			; save the flags so can decide to return below
 	call	iputs
 	db	".cache_slot_fill cache hit: \0"
-	call	bios_debug_disk
+	call	disk_dump
 	pop	af
 .dbg_csm:
 endif
@@ -417,7 +417,7 @@ endif
 if .dmcache_debug >= 2
 	call	iputs
 	db	".cache_slot_fill cache miss: \0"
-	call	bios_debug_disk
+	call	disk_dump
 endif
 
 	push	de			; put a copy of the CP/M track we want back onto the stack
@@ -1082,7 +1082,7 @@ if .dmcache_debug >= 1
 	call	hexdump_a
 	call	iputs
 	db	": \0"
-	call	bios_debug_disk
+	call	disk_dump
 	pop	bc
 endif
 
