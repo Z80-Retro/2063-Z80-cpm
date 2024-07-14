@@ -26,6 +26,7 @@ $(CLEAN_DIRS):
 REL_FILES=\
 	LICENSE \
 	Makefile \
+	Make.default \
 	README-SD.md \
 	README.md \
 	boot \
@@ -40,8 +41,9 @@ REL_FILES=\
 	filesystem/Makefile \
 	filesystem/README.md \
 	filesystem/diskdefs \
-	filesystem/retro.img \
+	filesystem/drive.img \
 	filesystem/assemblers
+
 
 release:
 	rm -f 2063-Z80-cpm.zip
