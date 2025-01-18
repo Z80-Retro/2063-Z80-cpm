@@ -17,4 +17,7 @@ ASM_FLAGS=-I../lib -I../libretro
 
 BOOT_MSG=Z80 Retro Board 2063.3
 
+# Define the assembler to use
+AS=z80asm
+
 -include $(TOP)/Make.local
