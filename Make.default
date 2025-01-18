@@ -13,11 +13,11 @@ SD_DEV=/dev/sda1
 SD_HOSTNAME=raspberrypi
 
 # Be default, build for the Z80-Retro!
-ASM_FLAGS=-I../lib -I../libretro
+CROSS_AS_FLAGS=-I../lib -I../libretro
 
 BOOT_MSG=Z80 Retro Board 2063.3
 
 # Define the assembler to use
-AS=z80asm
+CROSS_AS=z80asm
 
 -include $(TOP)/Make.local

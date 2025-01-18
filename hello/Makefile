@@ -11,7 +11,7 @@ clean:
 DATE := $(shell date +"%Y-%m-%d %H:%M:%S%z")
 GIT_VERSION := $(shell git describe --long --dirty; git show -s --format='%ci')
 %.bin: %.asm
-	cat $< | sed -e "s/@@DATE@@/$(DATE)/g" -e "s/@@GIT_VERSION@@/$(GIT_VERSION)/g" | $(AS) - -o $@ --list=$(basename $@).lst $(ASM_FLAGS)
+	cat $< | sed -e "s/@@DATE@@/$(DATE)/g" -e "s/@@GIT_VERSION@@/$(GIT_VERSION)/g" | $(CROSS_AS) - -o $@ --list=$(basename $@).lst $(CROSS_AS_FLAGS)
 
 
 world: clean all
