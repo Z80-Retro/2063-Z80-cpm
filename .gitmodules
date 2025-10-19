@@ -1,3 +1,6 @@
 [submodule "cpm-2.2"]
 	path = cpm-2.2
 	url = https://github.com/Z80-Retro/cpm-2.2.git
+[submodule "filesystem/utils/xmodem80"]
+	path = filesystem/utils/xmodem80
+	url = https://github.com/Z80-Retro/xmodem80.git
