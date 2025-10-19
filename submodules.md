@@ -9,7 +9,7 @@
 ## Pulling a newly added submodule into an existing clone
 
 	git pull
-	git submodule init
+	git submodule update --init --recursive
 
 ## Checking status
 
