@@ -1,3 +1,5 @@
+all::
+
 SUBDIRS=\
 	boot \
 	retro \
@@ -5,23 +7,8 @@ SUBDIRS=\
 	hello \
 	filesystem
 
-CLEAN_DIRS=$(SUBDIRS:%=clean-%)
-ALL_DIRS=$(SUBDIRS:%=all-%)
-
-.PHONY: all clean release $(CLEAN_DIRS) $(ALL_DIRS)
-
-all:: $(ALL_DIRS)
-
-clean:: $(CLEAN_DIRS)
-
-world:: clean all
-
-$(ALL_DIRS):
-	$(MAKE) -C $(@:all-%=%) all
-
-$(CLEAN_DIRS):
-	$(MAKE) -C $(@:clean-%=%) clean
-
+TOP=.
+include $(TOP)/Make.rules
 
 REL_FILES=\
 	LICENSE \

@@ -26,9 +26,11 @@ all::
 # Include the detault and any local override rules
 # Must set TOP before including Make.default
 TOP=..
+include $(TOP)/Make.rules
 include $(TOP)/Make.default
 
-.PHONY: all clean world burn blank-all-sd
+
+.PHONY: burn blank-all-sd
 
 
 all:: drive.img 
