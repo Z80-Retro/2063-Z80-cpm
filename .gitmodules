@@ -1,3 +1,10 @@
 [submodule "cpm-2.2"]
 	path = cpm-2.2
+	branch = main
 	url = https://github.com/Z80-Retro/cpm-2.2.git
+
+[submodule "xmodem80"]
+	path = filesystem/utils/xmodem80
+	branch = master
+	url = https://github.com/Z80-Retro/xmodem80.git
+
