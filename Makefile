@@ -17,7 +17,7 @@ REL_FILES=\
 	README-SD.md \
 	README.md \
 	boot \
-	cpm22 \
+	cpm-2.2 \
 	doc \
 	hello \
 	lib \
@@ -29,7 +29,8 @@ REL_FILES=\
 	filesystem/README.md \
 	filesystem/diskdefs \
 	filesystem/drive.img \
-	filesystem/assemblers
+	filesystem/assemblers \
+	filesystem/utils \
 
 
 release:
