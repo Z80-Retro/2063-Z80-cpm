@@ -2,7 +2,8 @@
 # not really what I want to use here
 
 SUBDIRS=\
-	mbasic
+	mbasic \
+	archive
 
 SRC=$(wildcard */*.z80)
 PROGS=$(SRC:%.z80=%.com)
