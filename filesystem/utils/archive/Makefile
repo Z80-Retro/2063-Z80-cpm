@@ -7,6 +7,7 @@ include $(TOP)/Make.rules
 
 BIN=\
 	lu310.com \
+	lu300.dqc \
 	unarc.com \
 	uncr-z80.com \
 	uncr8080.com \
