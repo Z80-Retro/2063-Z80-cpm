@@ -46,7 +46,6 @@ siob_tx_ready:
 ; Return NZ (with A=1) if sio A rx is ready and Z (with A=0) if not ready.
 ; Clobbers: AF
 ;##############################################################
-con_rx_ready:
 sioa_rx_ready:
 	in	a,(sio_ac)	; read sio control status byte
 	and	1		; check the rcvr ready bit
@@ -107,7 +106,6 @@ siob_tx_char:
 	out	(sio_bd),a	; send the character
 	ret
 
-con_tx_char:
 sioa_tx_char:
 	call	sioa_tx_ready
 	jr	z,sioa_tx_char
@@ -126,7 +124,6 @@ siob_rx_char:
 	in	a,(sio_bd)
 	ret
 
-;con_rx_char:
 sioa_rx_char:
 	call	sioa_rx_ready
 	jr	z,sioa_rx_char

@@ -54,3 +54,7 @@ con_rx_char:
         ret
 endif
 
+
+con_tx_ready:   equ     sioa_tx_ready
+con_rx_ready:   equ     sioa_rx_ready
+con_tx_char:    equ     sioa_tx_char
