@@ -5,21 +5,25 @@ TOP=../../..
 include $(TOP)/Make.default
 include $(TOP)/Make.rules
 
-PROGS=\
+BIN=\
 	lu310.com \
-	lu310.hlp \
-	lu300.dqc \
 	unarc.com \
-	unarc.doc \
 	uncr-z80.com \
 	uncr8080.com \
-	uncr8080.doc \
 	unzip.com \
-	usq120.com \
+	usq120.com
+
+TXT=\
+	lu310.hlp \
+	unarc.doc \
+	uncr8080.doc \
 	usq120.doc
 
-all:: $(PROGS)
+all:: $(BIN) $(TXT)
 
-$(PROGS):
+$(BIN):
 	wget -O $@ http://cpmarchives.classiccmp.org/cpm/mirrors/oak.oakland.edu/pub/cpm/starter-/$@
 
+$(TXT):
+	wget -O $@ http://cpmarchives.classiccmp.org/cpm/mirrors/oak.oakland.edu/pub/cpm/starter-/$@
+	unix2dos $@
