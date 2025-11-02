@@ -8,21 +8,21 @@ We can use the `cpmtools` package to do this.  On a Debian-derived linux system 
 
 It is not documented, but a `diskdefs` file in the current directory will be searched my the `cpmtools` commands for the given `-f` format:
 
-	mkfs.cpm -f z80-retro-2k-8m retro.img
+	mkfs.cpm -f z80-retro-8k-8m retro.img
 
 Note that the above will 0xe5 out the reserved tracks and nothing more.
 
 To include the retro.bin CP/M os image on the reserved tracks, add it to the command like this:
 
-	mkfs.cpm -f z80-retro-2k-8m -b ../retro/retro.bin retro.img
+	mkfs.cpm -f z80-retro-8k-8m -b ../retro/retro.bin retro.img
 
 Once a filesystem has been initialized by the mkfs.cpm command, files can be added to it like this:
 
-	cpmcp -f z80-retro-2k-8m retro.img ../cpm22/filesystem/* 0:
+	cpmcp -f z80-retro-8k-8m retro.img ../cpm-2.2/filesystem/* 0:
 
 We can also look at what files are on the CP/M filesystem with the `cpmls` command like this:
 
-	cpmls -f z80-retro-2k-8m retro.img
+	cpmls -f z80-retro-8k-8m retro.img
 
 ## Multiple filesystems on one SD card
 
