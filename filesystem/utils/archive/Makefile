@@ -16,7 +16,7 @@ PROGS=\
 	uncr8080.doc \
 	unzip.com \
 	usq120.com \
-	usq120.hex
+	usq120.doc
 
 all:: $(PROGS)
 
