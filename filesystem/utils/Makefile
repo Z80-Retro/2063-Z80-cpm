@@ -18,7 +18,7 @@ include $(TOP)/Make.default
 .PHONY: all clean world burn blank-all-sd
 
 %.com: %.z80
-	z80asm -o $@ $^
+	$(CROSS_AS) -o $@ $^
 
 clean::
 	rm -f $(PROGS)
