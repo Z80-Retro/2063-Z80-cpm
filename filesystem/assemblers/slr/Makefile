@@ -1,20 +1,20 @@
 # Go get the SLR assemblers & linker from www.retroarchive.org
 
-all:: SLRNK.COM Z80ASM.COM 
+all:: bin/SLRNK.COM bin/Z80ASM.COM 
 #SLR180.COM 
 
 TOP=../../..
 include $(TOP)/Make.default
 include $(TOP)/Make.rules
 
-SLR180.COM:	SLR180.ZIP
-	unzip -n SLR180.ZIP
+bin/SLR180.COM:	SLR180.ZIP
+	unzip -n -d bin SLR180.ZIP
 
-SLRNK.COM: SLRNK.ZIP
-	unzip -n SLRNK.ZIP
+bin/SLRNK.COM: SLRNK.ZIP
+	unzip -n -d bin SLRNK.ZIP
 
-Z80ASM.COM: Z80ASM.ZIP
-	unzip -n Z80ASM.ZIP
+bin/Z80ASM.COM: Z80ASM.ZIP
+	unzip -n -d bin Z80ASM.ZIP
 
 SLR180.ZIP:
 	wget http://www.retroarchive.org/cpm/lang/SLR180.ZIP
