@@ -23,6 +23,7 @@
 all::
 
 SUBDIRS=\
+	assemblers\
 	utils
 
 # Include the detault and any local override rules
