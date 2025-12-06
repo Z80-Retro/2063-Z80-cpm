@@ -9,12 +9,15 @@ include $(TOP)/Make.rules
 
 bin/SLR180.COM:	SLR180.ZIP
 	unzip -n -d bin SLR180.ZIP
+	touch bin/*
 
 bin/SLRNK.COM: SLRNK.ZIP
 	unzip -n -d bin SLRNK.ZIP
+	touch bin/*
 
 bin/Z80ASM.COM: Z80ASM.ZIP
 	unzip -n -d bin Z80ASM.ZIP
+	touch bin/*
 
 SLR180.ZIP:
 	wget http://www.retroarchive.org/cpm/lang/SLR180.ZIP
