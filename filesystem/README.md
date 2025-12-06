@@ -62,9 +62,10 @@ For more apps that can run on your Retro! board, search the Internet for variati
 
 Some big archives that might keep you busy for a while can be found here:
 
-	http://cpmarchives.classiccmp.org/
-	https://ifarchive.org/indexes/if-archiveXgamesXcpm.html
-	https://deramp.com/downloads/mfe_archive/040-Software/Digital%20Research/CPM%20Implementations/COMPUPRO/GAMES/
+* http://www.retroarchive.org/cpm/lang/lang.htm
+* http://cpmarchives.classiccmp.org/
+* https://ifarchive.org/indexes/if-archiveXgamesXcpm.html
+* https://deramp.com/downloads/mfe_archive/040-Software/Digital%20Research/CPM%20Implementations/COMPUPRO/GAMES/
 
 If you want something to cook on your CPU and test every instruction, you can try
 `zexall.com` and `zexdoc.com` files found in the CPM.zip file located here:
