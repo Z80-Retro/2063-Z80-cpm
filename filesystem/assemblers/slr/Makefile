@@ -17,6 +17,7 @@ bin/SLRNK.COM: SLRNK.ZIP
 
 bin/Z80ASM.COM: Z80ASM.ZIP
 	unzip -n -d bin Z80ASM.ZIP
+	rm -f bin/DUMP.*		# this will conflict with the DUMP.COM from the cp/m distro
 	touch bin/*
 
 SLR180.ZIP:

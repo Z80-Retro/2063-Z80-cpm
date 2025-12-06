@@ -48,6 +48,7 @@ drive.img: ../retro/retro.bin
 	mkfs.cpm -f $(DISKDEF) -b ../retro/retro.bin $@
 	cpmcp -f $(DISKDEF) $@ ../cpm-2.2/filesystem/* 0:
 	cpmcp -f $(DISKDEF) $@ assemblers/sid/*.com 0:
+	cpmcp -f $(DISKDEF) $@ assemblers/slr/bin/* 0:
 	cpmcp -f $(DISKDEF) $@ adventure/* 0:
 	cpmcp -f $(DISKDEF) $@ utils/mbasic/*.com 0:
 	cpmcp -f $(DISKDEF) $@ utils/xmodem80/*.com 0:
