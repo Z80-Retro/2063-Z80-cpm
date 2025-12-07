@@ -1,6 +1,6 @@
 # Go get the SLR assemblers & linker from www.retroarchive.org
 
-all:: bin/SLRNK.COM bin/Z80ASM.COM 
+all:: bin/SLRNK.COM bin/Z80ASM.COM bin/Z80ASM.PDF
 #SLR180.COM 
 
 TOP=../../..
@@ -17,8 +17,11 @@ bin/SLRNK.COM: SLRNK.ZIP
 
 bin/Z80ASM.COM: Z80ASM.ZIP
 	unzip -n -d bin Z80ASM.ZIP
-	rm -f bin/DUMP.*		# this will conflict with the DUMP.COM from the cp/m distro
+	rm -f bin/DUMP.*		# This conflicts with the copy of DUMP.COM from the CP/M distro
 	touch bin/*
+
+bin/Z80ASM.PDF: slr_man.zip
+	unzip -n -d doc slr_man.zip
 
 SLR180.ZIP:
 	wget http://www.retroarchive.org/cpm/lang/SLR180.ZIP
@@ -28,3 +31,6 @@ SLRNK.ZIP:
 
 Z80ASM.ZIP:
 	wget http://www.retroarchive.org/cpm/lang/Z80ASM.ZIP
+
+slr_man.zip:
+	wget http://www.retroarchive.org/cpm/lang/slr_man.zip
