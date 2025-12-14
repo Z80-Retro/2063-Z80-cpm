@@ -39,4 +39,4 @@ gpio_in_sd_miso:	equ	0x80
 
 ; The initial value to write into the gpio_out latch.
 ; The value here will idle the SD card interface.
-gpio_out_init:          equ     gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel
+gpio_out_init:          equ     gpio_out_sd_mosi|gpio_out_sd_ssel

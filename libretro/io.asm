@@ -93,4 +93,4 @@ gpio_in_sd_miso:	equ	0x80
 
 ; The initial value to write into the gpio_out latch.
 ; This will select low-bank E, idle the SD card, and idle the printer.
-gpio_out_init:  equ     gpio_out_sd_mosi|gpio_out_sd_clk|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
+gpio_out_init:  equ     gpio_out_sd_mosi|gpio_out_sd_ssel|gpio_out_prn_stb|(.low_bank<<4)
