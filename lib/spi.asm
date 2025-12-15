@@ -78,6 +78,16 @@
 ; byte in a di/ei pair, the write time is maximized but the worst-case
 ; interrupt latency becomes 36us.  This is probably the best choice.
 ;
+; ** JW 2025-12-15 The Retro SPI driver never used to DI/EI this critical
+; region (to protect the latch & cached value relationship.)  The rule 
+; has always been that no IRQ handler shall touch either the cached latch
+; value nor the latch itself.  Therefore the DI/EI is not present in this
+; version of the code.
+;
+; Note that blindly doing so is invalid anyway because it will enable
+; IRQs even if they did not used to be enabled... which is another problem
+; that we are avoiding by omitting the DI/EI pair here.
+;
 ;############################################################################
 
 spi_write1: macro   ; 42 cycles / bit
@@ -116,7 +126,7 @@ spi_write_str:      ; hl has read buffer pointer, bc has count
             ld c, (hl)          ; Fetch byte from write buffer          7
             inc hl              ; Increment buffer pointer              6
 
-            di                  ; Critical section start
+            ;di                  ; Critical section start
             spi_write1  ;7      ; Write 8 bits                          42 * 8 = 336
             spi_write1  ;6      ; Inlining this saves call and ret cycles
             spi_write1  ;5
@@ -125,7 +135,7 @@ spi_write_str:      ; hl has read buffer pointer, bc has count
             spi_write1  ;2
             spi_write1  ;1
             spi_write1  ;0
-            ei                  ; Critical section end
+            ;ei                  ; Critical section end
 
             djnz .write_str_loop    ; Loop count.LSB first, 256 thereafter  13/7
 
