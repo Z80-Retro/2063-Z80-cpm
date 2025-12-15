@@ -3,6 +3,7 @@
 
 SUBDIRS=\
 	mbasic \
+	bbcbasic \
 	archive
 
 SRC=$(wildcard */*.z80)
